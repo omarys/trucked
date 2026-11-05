@@ -4,6 +4,7 @@
 # a major bump would silently install a runtime the build cannot use.
 [tools]
 dotnet = "10"
+pre-commit = "latest"
 
 [env]
 # Keep the SDK out of the system-wide lookup path. Without this a plain `dotnet`
@@ -32,13 +33,33 @@ run = "dotnet run --project src/Trucked.Cli -c Release -- --sim"
 description = "Run standard balance benchmarks across representative archetype matchups"
 run = "dotnet run --project src/Trucked.Cli -c Release -- --sim -a1 'Veteran Duelist' -a2 'Veteran Mage' -n 100"
 
+# The engine is a NuGet dependency, so "updating the engine" means repacking it
+# in its own repo and moving the pin. NuGet caches by version: repacking under an
+# existing version is invisible here, so `pack` fails loudly if the version has
+# not moved past what this repo already consumes.
 [tasks.pack-engine]
-description = "Repack the sibling Fornach engine into its local feed"
+description = "Repack the sibling Fornach engine into its local feed, then report whether the pin moved"
 run = """
-cd ../fornach
-dotnet pack src/Fornach.Spatial -c Release -o packages
-dotnet pack src/Fornach.Domain  -c Release -o packages
-dotnet pack src/Fornach.Engine  -c Release -o packages
+set -e
+mise -C ../fornach run pack
+current=$(grep -oP '(?<=<FornachVersion>)[^<]+' Directory.Build.props)
+packed=$(grep -oP '(?<=<Version>)[^<]+' ../fornach/Directory.Build.props)
+echo "Trucked pins FornachVersion $current; the feed now holds $packed"
+if [ "$current" = "$packed" ]; then
+  echo "Bump FornachVersion in Directory.Build.props, or the restore below will"
+  echo "reuse the cached $current and silently ignore the new packages."
+fi
+"""
+
+[tasks.update-engine]
+description = "Repack the engine, move the pin to its current version, and restore"
+run = """
+set -e
+mise -C ../fornach run pack
+packed=$(grep -oP '(?<=<Version>)[^<]+' ../fornach/Directory.Build.props)
+sed -i "s|<FornachVersion>[^<]*</FornachVersion>|<FornachVersion>$packed</FornachVersion>|" Directory.Build.props
+dotnet restore Trucked.slnx --nologo
+echo "Trucked now pins FornachVersion $packed"
 """
 
 [tasks.fmt]
@@ -48,3 +69,11 @@ run = "dotnet fantomas src tests"
 [tasks.fmt-check]
 description = "Check F# code formatting without making changes"
 run = "dotnet fantomas check src tests"
+
+[tasks.hooks]
+description = "Install pre-commit hooks into .git/hooks"
+run = "pre-commit install && pre-commit install --hook-type pre-push"
+
+[tasks.hooks-run]
+description = "Run all pre-commit hooks against the whole tree"
+run = "pre-commit run --all-files"

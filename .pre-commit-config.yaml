@@ -1,0 +1,47 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-merge-conflict
+      - id: check-yaml
+      - id: check-added-large-files
+        args: ["--maxkb=512"]
+      - id: check-xml
+
+  - repo: local
+    hooks:
+      - id: dotnet-build
+        name: dotnet build (Release, zero warnings)
+        entry: dotnet build Trucked.slnx -c Release -v q --nologo
+        language: system
+        pass_filenames: false
+        files: \.(fs|fsproj|slnx|props)$
+
+      - id: dotnet-test
+        name: dotnet test (story, tower, UI and balance suites)
+        entry: dotnet test Trucked.slnx --nologo -v q
+        language: system
+        pass_filenames: false
+        stages: [pre-push]
+        files: \.(fs|fsproj)$
+
+      - id: sim-check
+        name: balance simulation sanity check
+        entry: dotnet run --project src/Trucked.Cli -c Release -- --sim -a1 "Veteran Fighter" -a2 "Veteran Mage" -n 25
+        language: system
+        pass_filenames: false
+        stages: [pre-push]
+        files: \.(fs|fsproj)$
+
+      # The engine arrives as packages, so a push must prove this repo still
+      # resolves against the version Directory.Build.props pins. It does not pack
+      # the engine: that is ../fornach's job (`mise run pack` there).
+      - id: engine-restore
+        name: restore against the pinned Fornach packages
+        entry: bash -c 'set -e; dotnet restore Trucked.slnx --nologo'
+        language: system
+        pass_filenames: false
+        stages: [pre-push]
+        files: \.(fs|fsproj|props|config)$
