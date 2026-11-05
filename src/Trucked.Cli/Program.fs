@@ -1537,7 +1537,7 @@ module Program =
   let private runInteractiveStory (debug: bool) (forcedSeed: int option) =
     AnsiConsole.Clear()
     AnsiConsole.Write(
-      Rule(sprintf "[bold %s]FORNACH: THE TRAUMA LOOP & THE GRIEF STAGES[/]" Theme.Yellow)
+      Rule(sprintf "[bold %s]TRUCKED: THE TRAUMA LOOP & THE GRIEF STAGES[/]" Theme.Yellow)
         .Centered()
         .RuleStyle(Theme.StylePurple)
     )
@@ -1719,7 +1719,7 @@ module Program =
                     formatMenuItem "󰈷 " "Swarm Tipping Point Balance Matrix" "128-matchup macro balance benchmark" Theme.Yellow
                     formatMenuItem "󰞁 " "Bestiary Monster Swarm Matrix" "Swarm tipping point for all 21 monsters vs classes" Theme.Red
                     formatMenuItem "󰒋 " "Symbol & Glyph Reference Manual" "Exhaustive guide to icons, meters & hazards" Theme.Yellow
-                    formatMenuItem "󰗼 " "Exit" "Close the Fornach Arena" Theme.Red
+                    formatMenuItem "󰗼 " "Exit" "Close the Trucked Arena" Theme.Red
                   ])
               )
 
@@ -1780,7 +1780,7 @@ module Program =
           | MenuCancelled ->
             AnsiConsole.Cursor.Show(true)
 
-        AnsiConsole.MarkupLine(sprintf "[bold %s]Exiting Fornach Arena. Farewell![/]" Theme.Yellow)
+        AnsiConsole.MarkupLine(sprintf "[bold %s]Exiting Trucked Arena. Farewell![/]" Theme.Yellow)
         0
     with e ->
       RuntimeLog.exn "FATAL" e

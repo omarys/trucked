@@ -1390,7 +1390,7 @@ module TowerDisplay =
       let floorRule =
         match inspectCursor with
         | Some _ ->
-          Rule(Display.stripNerdGlyphs (sprintf "[bold %s]󰍹 FORNACH: TILE & HAZARD INSPECTION MODE ── FLOOR %d: %s[/]"
+          Rule(Display.stripNerdGlyphs (sprintf "[bold %s]󰍹 TRUCKED: TILE & HAZARD INSPECTION MODE ── FLOOR %d: %s[/]"
             Theme.Yellow
             state.CurrentFloor.FloorNumber
             state.CurrentFloor.Theme.Name))
@@ -1407,14 +1407,14 @@ module TowerDisplay =
               | 5 -> "STAGE 4: BARGAINING"
               | 6 -> "STAGE 5: DEPRESSION"
               | _ -> "STAGE 6: ACCEPTANCE"
-            Rule(Display.stripNerdGlyphs (sprintf "[bold %s]󰈙 FORNACH: %s ── %s[/]"
+            Rule(Display.stripNerdGlyphs (sprintf "[bold %s]󰈙 TRUCKED: %s ── %s[/]"
               state.CurrentFloor.Theme.ColorHex
               stageName
               state.CurrentFloor.Theme.Name))
               .Centered()
               .RuleStyle(Style(foreground = Nullable (themeColor state.CurrentFloor.Theme)))
           else
-            Rule(Display.stripNerdGlyphs (sprintf "[bold %s]󰒋 FORNACH: THE INFINITE TOWER ── FLOOR %d: %s[/]"
+            Rule(Display.stripNerdGlyphs (sprintf "[bold %s]󰒋 TRUCKED: THE INFINITE TOWER ── FLOOR %d: %s[/]"
               state.CurrentFloor.Theme.ColorHex
               state.CurrentFloor.FloorNumber
               state.CurrentFloor.Theme.Name))

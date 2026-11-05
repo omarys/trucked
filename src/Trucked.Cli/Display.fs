@@ -709,7 +709,7 @@ module Display =
     grid.Expand <- true
     AnsiConsole.Clear()
     AnsiConsole.Write(
-      Rule(sprintf "[bold %s]󰓥 Fornach Duel Arena ── Round %d[/]" Theme.Yellow roundNumber)
+      Rule(sprintf "[bold %s]󰓥 Trucked Duel Arena ── Round %d[/]" Theme.Yellow roundNumber)
         .Centered()
         .RuleStyle(Theme.StylePurple)
     )
@@ -1153,7 +1153,7 @@ module Display =
     let grid = Grid()
     grid.AddColumn(GridColumn()) |> ignore
 
-    grid.AddRow(Markup(sprintf "[bold %s]󰒋 FORNACH: COMPREHENSIVE SYMBOL & GLYPH REFERENCE MANUAL[/]" Theme.Yellow)) |> ignore
+    grid.AddRow(Markup(sprintf "[bold %s]󰒋 TRUCKED: COMPREHENSIVE SYMBOL & GLYPH REFERENCE MANUAL[/]" Theme.Yellow)) |> ignore
     grid.AddRow(Rule().RuleStyle(Theme.StylePurple)) |> ignore
 
     // Section 1: Navigation & Hotkeys
