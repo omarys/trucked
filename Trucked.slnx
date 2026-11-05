@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Trucked.Story/Trucked.Story.fsproj" />
+    <Project Path="src/Trucked.Cli/Trucked.Cli.fsproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Trucked.Tests/Trucked.Tests.fsproj" />
+  </Folder>
+</Solution>

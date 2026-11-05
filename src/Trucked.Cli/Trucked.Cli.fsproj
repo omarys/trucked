@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <AssemblyName>trucked</AssemblyName>
+    <RootNamespace>Trucked.Cli</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="Types.fs" />
+    <Compile Include="Archetypes.fs" />
+    <Compile Include="Theme.fs" />
+    <Compile Include="EnvironmentScenes.fs" />
+    <Compile Include="Display.fs" />
+    <Compile Include="DeathAnimation.fs" />
+    <Compile Include="Simulation.fs" />
+    <Compile Include="TowerDisplay.fs" />
+    <Compile Include="Program.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Spectre.Console" Version="0.57.2" />
+    <PackageReference Include="Fornach.Engine" Version="$(FornachVersion)" />
+    <PackageReference Include="Fornach.Domain" Version="$(FornachVersion)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Trucked.Story\Trucked.Story.fsproj" />
+  </ItemGroup>
+
+</Project>

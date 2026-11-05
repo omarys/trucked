@@ -1,0 +1,14 @@
+schema: spec-driven
+openlore:
+  version: 1.2.0
+  domains:
+    - agents
+    - context
+    - trucked-cli
+    - trucked-story
+  confidence: 0.95
+context: |-
+  # User-provided context (preserved)
+  # Trucked is the game; Fornach (../fornach) is the engine it consumes as packages.
+  Tech stack: F#, .NET 10, Spectre.Console, Ink (Qyl27.Ink.Engine)
+  Domains: agents, context, trucked-cli, trucked-story

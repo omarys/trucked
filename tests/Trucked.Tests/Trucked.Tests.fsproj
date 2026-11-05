@@ -1,0 +1,47 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Story and tower behaviour: what the game does with the engine. -->
+    <Compile Include="CliMarkupTests.fs" />
+    <Compile Include="MenuCancelTests.fs" />
+    <Compile Include="TacticalAssessmentTests.fs" />
+    <Compile Include="BossTuningTests.fs" />
+    <Compile Include="OptimalPlayTests.fs" />
+    <Compile Include="StoryBridgeTests.fs" />
+    <Compile Include="StorySpatialTests.fs" />
+    <Compile Include="StoryTutorialTests.fs" />
+    <Compile Include="StoryIntroCurveTests.fs" />
+    <Compile Include="GriefAspectLadderTests.fs" />
+    <Compile Include="TowerTests.fs" />
+    <Compile Include="EncounterTests.fs" />
+    <Compile Include="BalanceRegressionTests.fs" />
+    <Compile Include="ClassBalanceTests.fs" />
+    <Compile Include="AttackEstimatorTests.fs" />
+    <Compile Include="HudAlignmentTests.fs" />
+    <Compile Include="AiRecoveryLockTests.fs" />
+    <Compile Include="CombatLoggerTests.fs" />
+    <Compile Include="GroupEngagementTests.fs" />
+    <Compile Include="FlankSessionTests.fs" />
+    <Compile Include="DebugToolingTests.fs" />
+    <Compile Include="CombatTacticsTests.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" />
+    <PackageReference Include="coverlet.collector" Version="6.0.4" />
+    <PackageReference Include="Fornach.Engine" Version="$(FornachVersion)" />
+    <PackageReference Include="Fornach.Domain" Version="$(FornachVersion)" />
+    <PackageReference Include="Fornach.Spatial" Version="$(FornachVersion)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Trucked.Story\Trucked.Story.fsproj" />
+    <ProjectReference Include="..\..\src\Trucked.Cli\Trucked.Cli.fsproj" />
+  </ItemGroup>
+</Project>

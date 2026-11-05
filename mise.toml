@@ -1,0 +1,50 @@
+# Dev and build dependencies, and the tasks that drive them.
+#
+# Pinned to the `10` major rather than "latest": the projects target net10.0, so
+# a major bump would silently install a runtime the build cannot use.
+[tools]
+dotnet = "10"
+
+[env]
+# Keep the SDK out of the system-wide lookup path. Without this a plain `dotnet`
+# resolves against /usr/lib64/dotnet, which ships .NET 8 only, and every run
+# fails with "You must install or update .NET". mise sets this for the `dotnet`
+# tool already; it is stated here so the requirement is visible in the repo.
+DOTNET_MULTILEVEL_LOOKUP = "0"
+
+[tasks.build]
+description = "Build the whole solution in Release"
+run = "dotnet build Trucked.slnx -c Release --nologo"
+
+[tasks.test]
+description = "Run the test suite"
+run = "dotnet test Trucked.slnx --nologo -v q"
+
+[tasks.game]
+description = "Launch the interactive Spectre.Console CLI arena"
+run = "dotnet run --project src/Trucked.Cli"
+
+[tasks.sim]
+description = "Run the headless balance simulation harness; pass args, e.g. `mise run sim -- -a1 'Veteran Fighter' -a2 'Veteran Mage' -n 500`"
+run = "dotnet run --project src/Trucked.Cli -c Release -- --sim"
+
+[tasks.benchmark]
+description = "Run standard balance benchmarks across representative archetype matchups"
+run = "dotnet run --project src/Trucked.Cli -c Release -- --sim -a1 'Veteran Duelist' -a2 'Veteran Mage' -n 100"
+
+[tasks.pack-engine]
+description = "Repack the sibling Fornach engine into its local feed"
+run = """
+cd ../fornach
+dotnet pack src/Fornach.Spatial -c Release -o packages
+dotnet pack src/Fornach.Domain  -c Release -o packages
+dotnet pack src/Fornach.Engine  -c Release -o packages
+"""
+
+[tasks.fmt]
+description = "Format all F# files using fantomas"
+run = "dotnet fantomas src tests"
+
+[tasks.fmt-check]
+description = "Check F# code formatting without making changes"
+run = "dotnet fantomas check src tests"

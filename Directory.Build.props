@@ -1,0 +1,17 @@
+<Project>
+
+  <!--
+    Trucked is the game; Fornach is the engine it is built on. The engine arrives as
+    packages from the sibling checkout's local feed (see nuget.config), so the only
+    place its version is written down is here.
+  -->
+  <PropertyGroup>
+    <FornachVersion>0.1.0</FornachVersion>
+    <Version>0.1.0</Version>
+    <Authors>Trucked</Authors>
+    <Product>Trucked</Product>
+    <IsPackable>false</IsPackable>
+    <Deterministic>true</Deterministic>
+  </PropertyGroup>
+
+</Project>

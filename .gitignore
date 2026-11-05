@@ -1,0 +1,9 @@
+bin/
+obj/
+*.user
+*.userosscache
+*.suo
+.vs/
+.idea/
+.ionide/
+logs/
