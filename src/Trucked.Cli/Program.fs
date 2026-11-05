@@ -15,7 +15,7 @@ module Program =
       else Console.WindowHeight
 
     AnsiConsole.Write(
-      FigletText("FORNACH")
+      FigletText("TRUCKED")
         .Centered()
         .Color(Theme.ColorPurple)
     )
