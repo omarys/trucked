@@ -1,4 +1,4 @@
-namespace Fornach.Domain.Tests
+namespace Trucked.Tests
 
 open System
 open Xunit

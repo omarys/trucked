@@ -2,7 +2,7 @@
 
 ## 1. Executive Summary & Narrative Metaphor
 
-*Fornach* explores a narrative of amnesia, loss, and traumatic memory recovery wrapped in tactical combat. The protagonist died in a real-world vehicle collision failing to save their twin sister (Lyra). Trapped in an existential purgatory loop, the protagonist's combat encounters are externalized manifestations of their repressed psychological trauma.
+*Trucked* explores a narrative of amnesia, loss, and traumatic memory recovery wrapped in tactical combat. The protagonist died in a real-world vehicle collision failing to save their twin sister (Lyra). Trapped in an existential purgatory loop, the protagonist's combat encounters are externalized manifestations of their repressed psychological trauma.
 
 Failure in combat triggers the sudden, absurd appearance of **"Truck-kun"**—a flatbed truck collision that violently pulls the protagonist back to the sensory horror of their fatal accident before rewinding the timeline to the stage checkpoint.
 

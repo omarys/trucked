@@ -1,4 +1,4 @@
-module Fornach.Domain.Tests.BossTuningTests
+module Trucked.Tests.BossTuningTests
 
 open Xunit
 open Fornach.Domain
