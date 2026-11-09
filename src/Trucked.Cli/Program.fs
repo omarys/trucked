@@ -635,11 +635,12 @@ module Program =
         else
           AnsiConsole.MarkupLine(sprintf "\n[bold %s]⚡ %s holds the Vor and strikes first![/]" Theme.Yellow enemy.Name)
           doEnemyTurn 1 playerActiveDefenseOpt
-          let wasGuardConsumed =
+          let wasActionConsumed =
             match playerIntent with
             | ActiveDefense _ -> true
+            | StandardAttack _ when choice.Contains("Seize Indes") -> true
             | _ -> false
-          if not combatOver && not wasGuardConsumed then
+          if not combatOver && not wasActionConsumed then
             doPlayerTurn 2
 
       if not combatOver then
@@ -862,7 +863,12 @@ module Program =
 
     mode, debugOptions
 
-  let private runStoryDuel (floorNumber: int) (player: Combatant) (boss: Combatant) : CombatOutcome * Combatant =
+  let private runStoryDuel
+    (floorNumber: int)
+    (player: Combatant)
+    (boss: Combatant)
+    (flankOf: CombatantId -> Fornach.Spatial.Flank)
+    (hazardHook: bool -> Combatant -> Combatant * CombatEvent list) : CombatOutcome * Combatant =
     let rng = Random()
     let roller : DiceRoller = fun min max -> rng.Next(min, max + 1)
 
@@ -877,6 +883,7 @@ module Program =
     let mutable combatOver = false
     let mutable outcome = CombatOutcome.PlayerDefeated
     let mutable enemyInterrupted = false
+    let mutable lastPlayerDefense : DefenseChoice option = None
 
     let session =
       CombatLogger.startSession
@@ -963,6 +970,15 @@ module Program =
           currentCombatant <- playerResult.Actor
           currentBoss <- playerResult.Target
 
+          let hasKnockback =
+            playerResult.Events
+            |> List.exists (function CombatEvent.CombatantKnockedBack _ -> true | _ -> false)
+          if hasKnockback then
+            let knockedBoss, hazardEvts = hazardHook false currentBoss
+            currentBoss <- knockedBoss
+            for evt in hazardEvts do
+              Display.logEvent evt
+
           enemyInterrupted <-
             playerResult.Events
             |> List.exists (function CombatEvent.ActionInterrupted _ -> true | _ -> false)
@@ -994,6 +1010,22 @@ module Program =
           let bossBeforeTurn = currentBoss
           let playerBeforeTurn = currentCombatant
 
+          let isRepeatedGuard = AI.adaptToDefensiveRepetition currentBoss lastPlayerDefense playerDefOpt
+          let effectiveEnemyIntent =
+            if isRepeatedGuard && (currentBoss.Name.StartsWith("Aspect of") || currentBoss.Level >= 2) then
+              match playerDefOpt with
+              | Some (Guard d) ->
+                let converted = AI.feintConvertVector enemyIntent d
+                if converted <> enemyIntent then
+                  AnsiConsole.MarkupLine(sprintf "\n[bold red]⚡ FEINT DETECTED! %s anticipates your predictable guard, converting the strike into a slicing cut![/]" currentBoss.Name)
+                  converted
+                else enemyIntent
+              | _ -> enemyIntent
+            else enemyIntent
+
+          lastPlayerDefense <- playerDefOpt
+          let flankMult = flankOf currentBoss.Id |> TowerSession.flankDamageMultiplier
+
           let enemyResult =
             if enemyInterrupted then
               AnsiConsole.MarkupLine(sprintf "\n[bold %s]⚡ %s is staggered from the technique interrupt! Attack defused![/]" Theme.Yellow currentBoss.Name)
@@ -1004,12 +1036,21 @@ module Program =
               AnsiConsole.MarkupLine(sprintf "\n[bold %s]%s executes telegraphed action%s...[/]" Theme.Pink currentBoss.Name tempoMsg)
               if floorNumber = 1 then
                 // Tutorial grace: the level-1 protagonist cannot be one-shot on the opening stage.
-                ActionResolver.resolveWithoutLethalWithDefense roller enemyIntent playerDefOpt currentBoss currentCombatant 0
+                ActionResolver.resolveWithoutLethalWithDefenseFlank roller effectiveEnemyIntent playerDefOpt currentBoss currentCombatant 0 flankMult
               else
-                ActionResolver.resolveExWithDefense roller enemyIntent playerDefOpt currentBoss currentCombatant 0
+                ActionResolver.resolveExWithDefenseFlank roller effectiveEnemyIntent playerDefOpt currentBoss currentCombatant 0 flankMult
 
           currentBoss <- enemyResult.Actor
           currentCombatant <- enemyResult.Target
+
+          let hasKnockback =
+            enemyResult.Events
+            |> List.exists (function CombatEvent.CombatantKnockedBack _ -> true | _ -> false)
+          if hasKnockback then
+            let knockedPlayer, hazardEvts = hazardHook true currentCombatant
+            currentCombatant <- knockedPlayer
+            for evt in hazardEvts do
+              Display.logEvent evt
 
           let intentDesc = if enemyInterrupted then "Staggered Recovery (Interrupted)" else Display.intentLogLabel enemyIntent bossBeforeTurn
           CombatLogger.recordTurn session round turnNumber intentDesc bossBeforeTurn playerBeforeTurn enemyResult
@@ -1042,11 +1083,12 @@ module Program =
         else
           AnsiConsole.MarkupLine(sprintf "\n[bold %s]⚡ %s holds the Vor and strikes first![/]" Theme.Yellow currentBoss.Name)
           doEnemyTurn 1 playerActiveDefenseOpt
-          let wasGuardConsumed =
+          let wasActionConsumed =
             match playerIntent with
             | ActiveDefense _ -> true
+            | StandardAttack _ when choice.Contains("Seize Indes") -> true
             | _ -> false
-          if not combatOver && not wasGuardConsumed then
+          if not combatOver && not wasActionConsumed then
             doPlayerTurn 2
 
       if not combatOver then

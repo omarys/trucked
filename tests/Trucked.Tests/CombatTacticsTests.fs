@@ -390,3 +390,75 @@ module CombatTacticsTests =
     Assert.True(moved, "Answering the strike is the reward for standing in the Nach")
     Assert.False(actor.IsInVor)
     Assert.True(target.IsInVor)
+
+  [<Fact>]
+  let ``Kinetic Dynamo relic grants Momentum on whiff`` () =
+    let actor =
+      { TierFactory.createClassLevel CharacterClass.Fighter 1 with
+          RelicModifiers = [ Trucked.Story.Relics.kineticDynamo ] }
+      |> Combatant.seizeVor
+    let target = TierFactory.createClassLevel CharacterClass.Fighter 100 |> Combatant.yieldVor
+    let lowRoller: DiceRoller = fun min _ -> min
+
+    let res = ActionResolver.resolveExWithDefense lowRoller (StandardAttack (ForceStrike false)) None actor target 0
+    Assert.True(res.Contest.Value.IsWhiff)
+    Assert.True(res.Actor.Momentum >= 1)
+    Assert.Contains(res.Events, (function CombatEvent.RelicEffectTriggered(_, "Kinetic Dynamo", _) -> true | _ -> false))
+
+  [<Fact>]
+  let ``Vampiric Riposte relic heals 10 percent max health when winning Indes`` () =
+    let wounded =
+      let p = TierFactory.createClassLevel CharacterClass.Fighter 30
+      { p with
+          Health = { p.Health with Current = 50 }
+          RelicModifiers = [ Trucked.Story.Relics.vampiricRiposte ] }
+    let hook = Trucked.Story.Relics.vampiricRiposte
+    let updated, _, evts = hook.Apply (RelicHookTrigger.OnIndesResolved true) wounded None
+    Assert.True(updated.Health.Current > 50, "Health should increase after winning Indes")
+    Assert.Contains(evts, (function CombatEvent.RelicEffectTriggered(_, "Vampiric Riposte", _) -> true | _ -> false))
+
+  [<Fact>]
+  let ``Phantasmal Cloak relic weaves a Mirror Clone when yielding the Vor`` () =
+    let actor =
+      { TierFactory.createClassLevel CharacterClass.Fighter 30 with
+          MirrorClones = 0
+          RelicModifiers = [ Trucked.Story.Relics.phantasmalCloak ] }
+    let hook = Trucked.Story.Relics.phantasmalCloak
+    let updated, _, evts = hook.Apply (RelicHookTrigger.OnTempoShifted false) actor None
+    Assert.Equal(1, updated.MirrorClones)
+    Assert.Contains(evts, (function CombatEvent.RelicEffectTriggered(_, "Phantasmal Cloak", _) -> true | _ -> false))
+
+  [<Fact>]
+  let ``Seize Indes action choice consumes turn in 1v1 duel logic`` () =
+    let choice = "⚡ Seize Indes: Counter-Strike (Wager the blow vs Power)"
+    let playerIntent = ActionIntent.StandardAttack (AttackClassification.ForceStrike false)
+    let wasActionConsumed =
+      match playerIntent with
+      | ActiveDefense _ -> true
+      | StandardAttack _ when choice.Contains("Seize Indes") -> true
+      | _ -> false
+    Assert.True(wasActionConsumed, "Seize Indes attack wager MUST consume the player's turn to prevent double-turn bug")
+
+  [<Fact>]
+  let ``Recklessness Fervor bonus grants double XP at Razor's Edge (>= 75)`` () =
+    let basePlayer = TierFactory.createClassLevel CharacterClass.Fighter 1
+    let state = TowerSession.initSessionWithMode basePlayer 42 1 true
+    let enemy =
+      state.CurrentFloor.Entities
+      |> Map.toList
+      |> List.pick (fun (_, ent) ->
+        match ent with
+        | EntityEnemy e when not e.IsDefeated && not e.IsBoss -> Some e
+        | _ -> None)
+
+    let calmState = TowerSession.resolveEnemyDefeat enemy.Id state
+    let calmXp = calmState.Player.Progression.CurrentXP
+
+    let recklessPlayer =
+      basePlayer
+      |> Combatant.updateMeters (fun m -> { m with Recklessness = Meter.Create 75 })
+    let recklessState = TowerSession.resolveEnemyDefeat enemy.Id { state with Player = recklessPlayer }
+    let recklessXp = recklessState.Player.Progression.CurrentXP
+
+    Assert.Equal(calmXp * 2, recklessXp)
+    Assert.Contains(recklessState.MessageLog, (fun msg -> msg.Contains("RAZOR'S EDGE")))

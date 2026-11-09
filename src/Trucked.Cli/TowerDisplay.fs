@@ -1115,7 +1115,7 @@ module TowerDisplay =
   let runTowerCrawlWithMode
     (initialPlayer: Combatant)
     (startFloor: int)
-    (onCombatDuel: int -> Combatant -> Combatant -> (CombatOutcome * Combatant))
+    (onCombatDuel: int -> Combatant -> Combatant -> (CombatantId -> Fornach.Spatial.Flank) -> (bool -> Combatant -> Combatant * CombatEvent list) -> (CombatOutcome * Combatant))
     (onGroupCombat: int -> Combatant -> TowerEnemy list -> bool -> GroupDuelReinforce option -> (CombatantId -> Fornach.Spatial.Flank) -> GroupDuelResult)
     (onDefeatAnimation: unit -> unit)
     (debug: bool)
@@ -1585,7 +1585,22 @@ module TowerDisplay =
                 // Snapshot the pools too: the duel's own console output is lost the moment the map
                 // redraws, so its cost is summarized into the chronicle below.
                 let playerBeforeDuel = state.Player
-                let outcome, updatedPlayer = onCombatDuel state.CurrentFloor.FloorNumber state.Player enemy.Combatant
+                let enemyPtOpt =
+                  state.CurrentFloor.Entities
+                  |> Map.tryPick (fun pt ent ->
+                    match ent with
+                    | EntityEnemy e when e.Id = enemy.Id -> Some pt
+                    | _ -> None)
+                let enemyPt = defaultArg enemyPtOpt state.PlayerPosition
+
+                let hazardHook (targetIsPlayer: bool) (target: Combatant) =
+                  let attackerPos, targetPos =
+                    if targetIsPlayer then enemyPt, state.PlayerPosition
+                    else state.PlayerPosition, enemyPt
+                  TowerSession.resolveKnockbackHazard state.CurrentFloor attackerPos targetPos target
+
+                let outcome, updatedPlayer =
+                  onCombatDuel state.CurrentFloor.FloorNumber state.Player enemy.Combatant (TowerSession.flankOf state) hazardHook
 
                 let duelTollText (after: Combatant) =
                   let hpLost = Math.Max(0, playerBeforeDuel.Health.Current - after.Health.Current)
@@ -1635,6 +1650,10 @@ module TowerDisplay =
                     // Armour and weapon wear earned in the fight stays with you.
                     state <- { state with Player = updatedPlayer }
                     AnsiConsole.MarkupLine(sprintf "\n[bold %s]Adversary vanquished![/]" Theme.Green)
+                    let _, recklessLabelOpt = TowerSession.recklessnessXpBonus state.Player.Meters.Recklessness.Value
+                    match recklessLabelOpt with
+                    | Some label -> AnsiConsole.MarkupLine(sprintf "[bold %s]%s[/]" Theme.Yellow label)
+                    | None -> ()
                     Thread.Sleep(900)
 
                   state <- TowerSession.resolveEnemyDefeat enemy.Id state
@@ -1652,25 +1671,51 @@ module TowerDisplay =
 
               elif choice.Contains("Quick Resolve") then
                 let levelBefore = state.Player.Level
-                let strainedPlayer =
-                  { state.Player with
-                      Health = state.Player.Health.ApplyDelta -15
-                      Morale = state.Player.Morale.ApplyDelta -10
-                      Meters = StatusMeters.Zero }
-                // Pools floor at zero, so the advertised cost is what was actually paid.
-                let hpPaid = Math.Max(0, state.Player.Health.Current - strainedPlayer.Health.Current)
-                let moralePaid = Math.Max(0, state.Player.Morale.Current - strainedPlayer.Morale.Current)
-                state <- { state with Player = strainedPlayer }
-                state <- TowerSession.resolveEnemyDefeat enemy.Id state
-                state <-
-                  { state with
-                      MessageLog =
-                        sprintf "Overcame %s (Level %d) with raw prowess (-%d HP, -%d Morale)."
-                          enemy.Name enemy.Combatant.Level hpPaid moralePaid
-                        :: state.MessageLog }
-                AnsiConsole.MarkupLine(sprintf "\n[bold %s]With steady resolve, you shatter the foe's stance![/]" Theme.Green)
-                Thread.Sleep(700)
-                showLevelUpBanner state levelBefore
+                let playerBefore = state.Player
+                let rng = Random()
+                let roller : DiceRoller = fun min max -> rng.Next(min, max + 1)
+                let mutable simPlayer = state.Player
+                let mutable simEnemy = enemy.Combatant
+                let mutable rounds = 0
+
+                while rounds < 8 && not simPlayer.Health.IsDepleted && not simEnemy.Health.IsDepleted && not (CollapseState.isCollapsed simEnemy.Collapse) do
+                  rounds <- rounds + 1
+                  let bestIntent = AI.chooseIntentUsing Policies.all simPlayer simEnemy
+                  let pRes = ActionResolver.resolve roller bestIntent simPlayer simEnemy
+                  simPlayer <- pRes.Actor
+                  simEnemy <- pRes.Target
+
+                  if not simEnemy.Health.IsDepleted && not (CollapseState.isCollapsed simEnemy.Collapse) then
+                    let eIntent = AI.chooseIntentUsing Policies.all simEnemy simPlayer
+                    let eRes = ActionResolver.resolve roller eIntent simEnemy simPlayer
+                    simEnemy <- eRes.Actor
+                    simPlayer <- eRes.Target
+
+                let hpLost = Math.Max(0, playerBefore.Health.Current - simPlayer.Health.Current)
+                let moraleLost = Math.Max(0, playerBefore.Morale.Current - simPlayer.Morale.Current)
+
+                if simPlayer.Health.IsDepleted || CollapseState.isCollapsed simPlayer.Collapse then
+                  onDefeatAnimation()
+                  state <- traumaReset state
+                  state <-
+                    { state with
+                        MessageLog = sprintf "Truck-kun strikes! Overwhelmed during quick resolve against %s. Rewound to entrance." enemy.Name :: state.MessageLog }
+                  state <- TowerSession.updateFov state
+                  AnsiConsole.MarkupLine(sprintf "\n[bold red]Trauma loop reset! Overwhelmed during quick resolve. Rewound to entrance.[/]")
+                  Thread.Sleep(1200)
+                else
+                  let grownPlayer = Combatant.growFromEncounter [ simEnemy ] simPlayer
+                  state <- { state with Player = grownPlayer }
+                  state <- TowerSession.resolveEnemyDefeat enemy.Id state
+                  state <-
+                    { state with
+                        MessageLog =
+                          sprintf "⚡ Quick Resolved %s (Level %d) in %d round(s) (-%d HP, -%d Morale)."
+                            enemy.Name enemy.Combatant.Level rounds hpLost moraleLost
+                          :: state.MessageLog }
+                  AnsiConsole.MarkupLine(sprintf "\n[bold %s]⚡ Quick Resolve Victory! Vanquished %s in %d round(s) (-%d HP, -%d Morale, +XP).[/]" Theme.Green enemy.Name rounds hpLost moraleLost)
+                  Thread.Sleep(700)
+                  showLevelUpBanner state levelBefore
 
               else
                 // Disengage
@@ -2011,7 +2056,7 @@ module TowerDisplay =
   let runTowerCrawl
     (initialPlayer: Combatant)
     (startFloor: int)
-    (onCombatDuel: int -> Combatant -> Combatant -> (CombatOutcome * Combatant))
+    (onCombatDuel: int -> Combatant -> Combatant -> (CombatantId -> Fornach.Spatial.Flank) -> (bool -> Combatant -> Combatant * CombatEvent list) -> (CombatOutcome * Combatant))
     (onGroupCombat: int -> Combatant -> TowerEnemy list -> bool -> GroupDuelReinforce option -> (CombatantId -> Fornach.Spatial.Flank) -> GroupDuelResult)
     (onDefeatAnimation: unit -> unit)
     (debug: bool)
@@ -2022,7 +2067,7 @@ module TowerDisplay =
   let runStoryCrawl
     (initialPlayer: Combatant)
     (startFloor: int)
-    (onCombatDuel: int -> Combatant -> Combatant -> (CombatOutcome * Combatant))
+    (onCombatDuel: int -> Combatant -> Combatant -> (CombatantId -> Fornach.Spatial.Flank) -> (bool -> Combatant -> Combatant * CombatEvent list) -> (CombatOutcome * Combatant))
     (onGroupCombat: int -> Combatant -> TowerEnemy list -> bool -> GroupDuelReinforce option -> (CombatantId -> Fornach.Spatial.Flank) -> GroupDuelResult)
     (onDefeatAnimation: unit -> unit)
     (debug: bool)

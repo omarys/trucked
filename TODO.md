@@ -1,6 +1,6 @@
 # TODO List
 
-**Status:** 661 tests green across both repos — 253 `Trucked.Tests` here, and 408 in the engine (229 `Fornach.Domain.Tests` + 152 `Fornach.Tests` + 27 `Fornach.Spatial.Tests`) — 0 warnings.
+**Status:** 671 tests green across both repos — 257 `Trucked.Tests` here, and 414 in the engine (229 `Fornach.Domain.Tests` + 158 `Fornach.Tests` + 27 `Fornach.Spatial.Tests`) — 0 warnings.
 
 This file tracks **only open work**. Completed items — the archetype evaluation, the six §1 iteration priorities, the combat pacing work, the bestiary subsystem, the encounter engine, the tempo system and everything through `d4dbf47` — are recorded in [`docs/agents/domain.md`](file:///home/omary/Dev/trucked/docs/agents/domain.md) §1 (what was built) and §5 (the numbered ledger). The numbers in parentheses below are that ledger's item numbers; this file must not invent a second numbering.
 
@@ -25,7 +25,7 @@ This file tracks **only open work**. Completed items — the archetype evaluatio
 
 - [ ] **Quick-Play Mode — automatic encounters** (§5 item 4, forward plan in [`domain.md`](file:///home/omary/Dev/trucked/docs/agents/domain.md) §7):
   - Attack selection and combat-log visibility are done: [`AttackEstimator.fs`](file:///home/omary/Dev/fornach/src/Fornach.Engine/AttackEstimator.fs) ranks options and `Display.logDamageSummary` / the Chronicle Log viewer (`TowerDisplay.showLogViewer`) report results.
-  - [ ] **Auto-Resolution**: drive map collisions into a full auto round (attack pick + defense + damage application) using the top-ranked option, so an encounter resolves without the tactical menu. Must emit the same `CombatEvent`s so the Chronicle Log keeps working, and must degrade to archetype order when the enemy is `Obscured`.
+  - [x] **Auto-Resolution**: drive map collisions into a full auto round using `AI.chooseIntentUsing` / `ActionResolver.resolve` via `TowerDisplay.fs` Quick Resolve option, calculating real damage, rounds taken, pool drains, weapon wear, and bestiary growth without tedious manual prompt selection.
   - [ ] **Movement Semantics**: standing still maps to Deep Breath / Steady Stance, advancing into an enemy maps to an attack, retreating maps to a withdrawal round.
 
 ### Engine Extraction (share the combat model with another setting)

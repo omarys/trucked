@@ -1148,6 +1148,15 @@ module Display =
     | CombatEvent.BeastExecuted _ ->
       AnsiConsole.MarkupLine(sprintf "  [bold %s]☠️ COUP DE GRÂCE:[/] Executed the fleeing beast! Harvested pelts and trophies (+15 Recklessness)!" Theme.Red)
 
+    | CombatEvent.CombatantKnockedBack (_, _, tiles) ->
+      AnsiConsole.MarkupLine(sprintf "  [bold %s]💨 KNOCKBACK:[/] Heavy kinetic impact sent target flying back %d tile(s)!" Theme.Yellow tiles)
+
+    | CombatEvent.HazardPushed (_, hazard, dmg, desc) ->
+      AnsiConsole.MarkupLine(sprintf "  [bold %s]🌋 HAZARD IMPACT (%s):[/] %s [bold %s](-%d HP)[/]" Theme.Orange hazard desc Theme.Red dmg)
+
+    | CombatEvent.RelicEffectTriggered (_, relicName, summary) ->
+      AnsiConsole.MarkupLine(sprintf "  [bold %s]✨ RELIC TRIGGER ([%s]%s[/]):[/] %s" Theme.Cyan Theme.Yellow relicName summary)
+
   /// Creates the Panel for the comprehensive Symbol & Glyph Reference Guide
   let createSymbolAndGlyphLegendPanel () : Panel =
     let grid = Grid()

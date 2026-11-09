@@ -1,0 +1,57 @@
+{
+  "generatedAt": "2026-11-05T22:56:20.442Z",
+  "specVersion": "1.0.0",
+  "domains": [
+    {
+      "domain": "agents",
+      "specPath": "openspec/specs/agents/spec.md",
+      "sourceFiles": [
+        "/home/omary/Dev/trucked/.pre-commit-config.yaml",
+        "/home/omary/Dev/trucked/TODO.md",
+        "/home/omary/Dev/trucked/AGENTS.md",
+        "/home/omary/Dev/trucked/mise.toml",
+        "/home/omary/Dev/trucked/README.md",
+        "/home/omary/Dev/trucked/.gitignore",
+        "/home/omary/Dev/trucked/Directory.Build.props",
+        "/home/omary/Dev/trucked/nuget.config",
+        "/home/omary/Dev/trucked/Trucked.slnx"
+      ],
+      "requirementCount": 4,
+      "dependsOn": [],
+      "calledBy": []
+    },
+    {
+      "domain": "trucked-cli",
+      "specPath": "openspec/specs/trucked-cli/spec.md",
+      "sourceFiles": [
+        "/home/omary/Dev/trucked/src/Trucked.Cli/Types.fs",
+        "/home/omary/Dev/trucked/src/Trucked.Cli/Archetypes.fs",
+        "/home/omary/Dev/trucked/src/Trucked.Cli/Simulation.fs",
+        "/home/omary/Dev/trucked/src/Trucked.Cli/EnvironmentScenes.fs",
+        "/home/omary/Dev/trucked/src/Trucked.Cli/TowerDisplay.fs",
+        "/home/omary/Dev/trucked/src/Trucked.Cli/DeathAnimation.fs",
+        "/home/omary/Dev/trucked/src/Trucked.Cli/Program.fs",
+        "/home/omary/Dev/trucked/src/Trucked.Cli/Theme.fs",
+        "/home/omary/Dev/trucked/src/Trucked.Cli/Display.fs",
+        "/home/omary/Dev/trucked/src/Trucked.Cli/Trucked.Cli.fsproj"
+      ],
+      "requirementCount": 41,
+      "dependsOn": [],
+      "calledBy": []
+    },
+    {
+      "domain": "trucked-story",
+      "specPath": "openspec/specs/trucked-story/spec.md",
+      "sourceFiles": [
+        "/home/omary/Dev/trucked/src/Trucked.Story/StoryTypes.fs",
+        "/home/omary/Dev/trucked/src/Trucked.Story/StoryRunner.fs",
+        "/home/omary/Dev/trucked/src/Trucked.Story/Policies.fs",
+        "/home/omary/Dev/trucked/src/Trucked.Story/Bosses.fs",
+        "/home/omary/Dev/trucked/src/Trucked.Story/Trucked.Story.fsproj"
+      ],
+      "requirementCount": 50,
+      "dependsOn": [],
+      "calledBy": []
+    }
+  ]
+}
