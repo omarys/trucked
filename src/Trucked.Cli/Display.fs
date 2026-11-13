@@ -574,6 +574,11 @@ module Display =
         "Accepting the inevitable, calming all turbulent entropy.",
         "Hold your ground.",
         "Discipline"
+    | Wait ->
+      sprintf "⏸️ [bold %s]Wait (Held Round)[/]" Theme.Yellow,
+      "Holding the round: venting strain and giving up the initiative.",
+      "Press the advantage while the guard is passive!",
+      "Defensive"
     | RecoveryAction SteadyForm ->
       sprintf "🛡️ [%s]Steady Form (Recovery)[/]" Theme.Yellow,
       "Settling posture to vent all strain and restore composure.",

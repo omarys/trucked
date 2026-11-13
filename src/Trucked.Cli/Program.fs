@@ -179,8 +179,8 @@ module Program =
       ThreadComplexForm ComplexForm.AegisLattice
     elif choice.Contains("Raise Shield") then
       RecoveryAction RaiseShield
-    elif choice.Contains("Steady Form") then
-      RecoveryAction SteadyForm
+    elif choice.Contains("Wait") then
+      Wait
     elif choice.Contains("Center Mind") then
       RecoveryAction CenterMind
     else
@@ -331,7 +331,7 @@ module Program =
           for slot in availablePreps |> List.filter (fun s -> s.Type = ConcealedBlade || s.Type = ParryingBuckler || s.Type = CaltropPouch || s.Type = BastionZoneControl) do
             formatPrepOption slot
           sprintf "🛡️  [bold %s]Raise Shield[/] (Bastion Posture: Repair Armor ~36%% of max, Gain 2 Combat Ramp, Bleed Recklessness)%s" Theme.Green raiseShieldTag
-          sprintf "🛡️  [%s]Steady Form[/] (Recovery: vent all strain via Poise & Composure, restore Morale, build Combat Ramp)" Theme.Green
+          sprintf "⏸️  [%s]Wait[/] (Hold: vent all strain, restore Morale, build Combat Ramp — cedes the Vor, so you strike only if the foe provokes)" Theme.Green
         else
           let resCounterTag = if isCounterPower then sprintf " [bold %s]★ Affinity Counter (Mitigates Power)[/]" Theme.Green else ""
           let intCounterTag = if isCounterAgility then sprintf " [bold %s]★ Affinity Counter (Mitigates Agility)[/]" Theme.Green else ""
@@ -378,8 +378,9 @@ module Program =
 
         // Active Armament Recovery: Shield Bastion Guard
         sprintf "🛡️  [bold %s]Raise Shield[/] (Bastion Posture: Repair Armor ~36%% of max, Gain 2 Combat Ramp, Bleed Recklessness)%s" Theme.Green raiseShieldTag
-        // Steady Form: the single recovery action, available to every discipline
-        sprintf "🛡️  [%s]Steady Form[/] (Recovery: vent all strain via Poise & Composure, restore Morale, build Combat Ramp)" Theme.Green
+        // Wait: the held round, available to every discipline. It carries the same recovery as the old
+        // Steady Form, but it spends the whole turn and gives up the Vor, which is what makes it a pass.
+        sprintf "⏸️  [%s]Wait[/] (Hold: vent all strain, restore Morale, build Combat Ramp — cedes the Vor, so you strike only if the foe provokes)" Theme.Green
 
       else
         // Arcane Spellcraft (Mental Characters in Vor or Indes)
