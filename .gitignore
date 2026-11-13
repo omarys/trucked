@@ -10,3 +10,4 @@ logs/
 
 # openlore analysis artifacts
 .openlore/
+.unipi/

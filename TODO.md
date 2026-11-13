@@ -1,6 +1,6 @@
 # TODO List
 
-**Status:** 671 tests green across both repos — 257 `Trucked.Tests` here, and 414 in the engine (229 `Fornach.Domain.Tests` + 158 `Fornach.Tests` + 27 `Fornach.Spatial.Tests`) — 0 warnings.
+**Status:** 674 tests green across both repos — 258 `Trucked.Tests` here, and 416 in the engine (229 `Fornach.Domain.Tests` + 160 `Fornach.Tests` + 27 `Fornach.Spatial.Tests`) — 0 warnings.
 
 This file tracks **only open work**. Completed items — the archetype evaluation, the six §1 iteration priorities, the combat pacing work, the bestiary subsystem, the encounter engine, the tempo system and everything through `d4dbf47` — are recorded in [`docs/agents/domain.md`](file:///home/omary/Dev/trucked/docs/agents/domain.md) §1 (what was built) and §5 (the numbered ledger). The numbers in parentheses below are that ledger's item numbers; this file must not invent a second numbering.
 
@@ -26,7 +26,9 @@ This file tracks **only open work**. Completed items — the archetype evaluatio
 - [ ] **Quick-Play Mode — automatic encounters** (§5 item 4, forward plan in [`domain.md`](file:///home/omary/Dev/trucked/docs/agents/domain.md) §7):
   - Attack selection and combat-log visibility are done: [`AttackEstimator.fs`](file:///home/omary/Dev/fornach/src/Fornach.Engine/AttackEstimator.fs) ranks options and `Display.logDamageSummary` / the Chronicle Log viewer (`TowerDisplay.showLogViewer`) report results.
   - [x] **Auto-Resolution**: drive map collisions into a full auto round using `AI.chooseIntentUsing` / `ActionResolver.resolve` via `TowerDisplay.fs` Quick Resolve option, calculating real damage, rounds taken, pool drains, weapon wear, and bestiary growth without tedious manual prompt selection.
-  - [ ] **Movement Semantics**: standing still maps to Deep Breath / Steady Stance, advancing into an enemy maps to an attack, retreating maps to a withdrawal round.
+  - [ ] **Movement Semantics**: advancing into an enemy maps to an attack (already the behaviour), retreating maps to a withdrawal round, and standing still maps to Deep Breath / Steady Stance.
+    - [x] **Retreating pays a withdrawal round** — the single-foe *Step Back / Disengage* charged nothing, so every encounter could be declined for free, while the group flee already lands a parting strike per foe (`Program.runStoryGroupDuel`). It now resolves one unanswered blow from the foe (non-lethal on floor 1, the same floor-1 rule the duel path uses) and rewinds to the entrance if that blow fells the player. `TowerDisplay.fs:1719` onward.
+    - [ ] **Standing still maps to Deep Breath** — there is no pass-turn input: every world-advancing keypress is either a move or the *Rest & Hone* heal (`TowerDisplay.fs:1965`), so nothing supplies `RecoveryAction SteadyForm` to a fight the player did not start. The mapping needs a decision first: does an enemy walking into a stationary player open on a breath, or does that path only ever surface as `GroupCombatTriggered`?
 
 ### Engine Extraction (share the combat model with another setting)
 Goal: `Fornach.Domain` + `Fornach.Engine` should be a reusable engine for the Power/Agility/Discipline physical-and-mental combat model, with everything story-and-tower-specific living in `Trucked.Story` / `Trucked.Cli`.

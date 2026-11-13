@@ -1718,11 +1718,43 @@ module TowerDisplay =
                   showLevelUpBanner state levelBefore
 
               else
-                // Disengage
-                state <-
-                  { state with
-                      MessageLog = sprintf "Stepped back from %s (Level %d)." enemy.Name enemy.Combatant.Level :: state.MessageLog }
-                ()
+                // Withdrawal round: turning away is not free. The group flee already pays a parting
+                // strike per foe (`Program.runStoryGroupDuel`), but the single foe charged nothing, so
+                // a player could decline every fight at no cost. Standing your ground is the tactical
+                // option; stepping back buys the distance at the price of one unanswered blow.
+                let rng = Random()
+                let roller : DiceRoller = fun min max -> rng.Next(min, max + 1)
+                let partingIntent = AI.chooseIntentUsing Policies.all enemy.Combatant state.Player
+                let partingStrike =
+                  if state.CurrentFloor.FloorNumber = 1 then
+                    // The first floor cannot kill outright; it teaches instead.
+                    ActionResolver.resolveWithoutLethal roller partingIntent enemy.Combatant state.Player
+                  else
+                    ActionResolver.resolveEx roller partingIntent enemy.Combatant state.Player 0
+                let withdrawn = partingStrike.Target
+                let hpLost = Math.Max(0, state.Player.Health.Current - withdrawn.Health.Current)
+
+                if withdrawn.Health.IsDepleted || CollapseState.isCollapsed withdrawn.Collapse then
+                  onDefeatAnimation()
+                  state <- traumaReset state
+                  state <-
+                    { state with
+                        MessageLog =
+                          sprintf "Truck-kun strikes! Cut down as you turned from %s. Rewound to entrance." enemy.Name
+                          :: state.MessageLog }
+                  state <- TowerSession.updateFov state
+                  AnsiConsole.MarkupLine(sprintf "\n[bold red]Trauma loop reset! The parting blow felled you. Rewound to entrance.[/]")
+                  Thread.Sleep(1200)
+                else
+                  state <-
+                    { state with
+                        Player = withdrawn
+                        MessageLog =
+                          sprintf "Withdrew from %s (Level %d) — it struck as you turned (-%d HP)."
+                            enemy.Name enemy.Combatant.Level hpLost
+                          :: state.MessageLog }
+                  AnsiConsole.MarkupLine(sprintf "\n[bold %s]You step back from %s — the parting blow costs %d HP.[/]" Theme.Yellow enemy.Name hpLost)
+                  Thread.Sleep(600)
 
             | TowerEvent.ChestOpened(chest, itemOpt, _) ->
               AnsiConsole.WriteLine()
