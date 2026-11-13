@@ -679,10 +679,10 @@ Recommended for the initiative and tier work in §1 AF–AH and §5 items 27–3
 Origin: the user's request that the tactical encounter menu be skippable by automating attack selection and each attack/defence round when a player/enemy collision occurs on the map. Standing still should simulate **Deep Breath / Steady Stance**, advancing into an enemy should simulate an **attack**, and retreating should simulate a **withdrawal**. The detailed checklist lives in [`TODO.md`](file:///home/omary/Dev/trucked/TODO.md) §7 item 7 — do not duplicate it here.
 
 What already exists and should be built on:
-- **Attack selection is solved** — [`AttackEstimator.fs`](file:///home/omary/Dev/fornach/src/Fornach.Engine/AttackEstimator.fs) already ranks options and the menu already consumes that ranking (§1 K). Auto-resolution only needs to pick the top-ranked entry rather than a player.
+- **Attack selection is solved** — [`AttackEstimator.fs`](file:///home/omary/Dev/fornach/src/Fornach.Engine/AttackEstimator.fs) ranks options, the menu consumes that ranking (§1 K), and auto-resolution now does too: `AI.chooseEstimatedAttack` ranks the plane's basic strikes by expected damage and spends the gambit only where the foe will outlast a burst and Recklessness is still under `AI.gambleCeiling`. It deliberately does not just take the top-ranked entry — the rounds-to-kill danger test and the Recklessness budget are what choose between the plain strike and its gambit form.
 - **The round machinery already exists** — `resolveDuel` / `resolveGroupFight` drive attack, defence and damage without the TUI, and already log applied damage plus the vitals swing (§1 Q).
 - **Recovery vocabulary exists** — `Steady Form` is the universal reset (all seven strain meters, Morale, Study Stacks); bleeding now decays with movement and waiting (§1 M). "Wait" on the map already maps to meaningful sim behaviour, so the movement semantics above are a mapping problem, not new mechanics.
-- **What is missing**: driving map collisions into a full auto round without the tactical menu, and the three movement→action mappings. Both are open in TODO §7.
+- **What is missing**: nothing — both halves landed. Collisions drive a full auto round, and the three movement→action mappings are closed in TODO §7 (advance attacks, retreat pays a withdrawal round, holding still is `ActionIntent.Wait`).
 
 Design constraints worth keeping:
 - Auto-resolution must emit the same `CombatEvent`s so the Chronicle Log and damage summaries keep working unchanged.
