@@ -1111,10 +1111,16 @@ module Program =
     AnsiConsole.WriteLine()
     AnsiConsole.MarkupLine(sprintf "[dim grey]Tactical combat log saved to: %s[/]" latestLog)
 
-    // Defeat still grows the player (+10 discipline) - the caller writes this combatant into the run
-    // state before its trauma reset, which restores pools but keeps the scars.
+    // Defeat still grows the player (+10 discipline) and banks the encounter - losing to a species
+    // teaches you it just as meeting one does. The caller writes this combatant into the run state
+    // before its trauma reset, which restores pools but keeps the scars.
     outcome,
-    (if outcome = CombatOutcome.PlayerDefeated then Combatant.growFromDefeat currentCombatant else currentCombatant)
+    (if outcome = CombatOutcome.PlayerDefeated then
+       currentCombatant
+       |> Combatant.growFromEncounter [ currentBoss ]
+       |> Combatant.growFromDefeat
+     else
+       currentCombatant)
 
   /// Renders the multi-enemy engagement HUD: the full player panel on the left, a one-row-per-foe pack
   /// table on the right, and a combat-log pane spanning the bottom. The pack used to be one bordered

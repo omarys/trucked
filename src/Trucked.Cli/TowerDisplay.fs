@@ -1698,7 +1698,14 @@ module TowerDisplay =
 
                 if simPlayer.Health.IsDepleted || CollapseState.isCollapsed simPlayer.Collapse then
                   onDefeatAnimation()
-                  state <- traumaReset { state with Player = Combatant.growFromDefeat simPlayer }
+                  // Losing to a species teaches it as surely as beating one: bank the encounter before
+                  // the trauma reset restores pools.
+                  let defeatedPlayer =
+                    simPlayer
+                    |> Combatant.growFromEncounter [ simEnemy ]
+                    |> Combatant.growFromDefeat
+
+                  state <- traumaReset { state with Player = defeatedPlayer }
                   state <-
                     { state with
                         MessageLog = sprintf "Truck-kun strikes! Overwhelmed during quick resolve against %s. Rewound to entrance." enemy.Name :: state.MessageLog }
@@ -1741,7 +1748,12 @@ module TowerDisplay =
 
                 if withdrawn.Health.IsDepleted || CollapseState.isCollapsed withdrawn.Collapse then
                   onDefeatAnimation()
-                  state <- traumaReset { state with Player = Combatant.growFromDefeat withdrawn }
+                  let defeatedPlayer =
+                    withdrawn
+                    |> Combatant.growFromEncounter [ enemy.Combatant ]
+                    |> Combatant.growFromDefeat
+
+                  state <- traumaReset { state with Player = defeatedPlayer }
                   state <-
                     { state with
                         MessageLog =

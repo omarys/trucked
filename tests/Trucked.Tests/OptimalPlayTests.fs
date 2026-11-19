@@ -334,8 +334,9 @@ module OptimalPlayer =
       // player class. These are pinning numbers, not targets: they fail when a balance change moves the
       // curve, and the spread between them is the finding worth arguing about.
       // Re-pinned after the ADR 0009 stress-growth rework: unfamiliar species cost 25% outgoing and
-      // +25% incoming damage until five encounters each, and discipline no longer meter-ramps, so
-      // the early floors pay for the redesign (Fighter 1.6 measured; Mage covered by the 1.0 default).
+      // +25% incoming damage, but the curve now moves only 1% per encounter (fifty to mastery), so a
+      // climb barely dents a species it meets once. Discipline no longer meter-ramps either, and the
+      // early floors pay for that (Fighter 1.7 measured; Mage covered by the 1.0 default).
       let baseline =
         match className with
         | "Fighter" -> 1.6
