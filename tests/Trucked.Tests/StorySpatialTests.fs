@@ -116,7 +116,7 @@ module StorySpatialTests =
     Assert.True(npcOpt.IsSome, sprintf "Stage %d must offer side quest %s" stageNum questId)
 
   [<Fact>]
-  let ``Scavenging battered chest awakens distinct combat archetypes with starting weapons and caltrops`` () =
+  let ``Scavenging battered chest awakens the two player kits with starting weapons and caltrops`` () =
     let fighter = StoryBosses.createProloguePlayer "fighter"
     Assert.Equal(CharacterClass.Fighter, fighter.Class)
     Assert.Equal(CombatStance.PowerStance, fighter.Stance)
@@ -132,37 +132,11 @@ module StorySpatialTests =
     Assert.True(mage.EquippedItems |> List.exists (fun it -> it.Name = "Weaver's Runic Robes"))
     Assert.True(mage.EquippedItems |> List.exists (fun it -> it.Name = "Sharpened Caltrops"))
 
-    let berserker = StoryBosses.createProloguePlayer "berserker"
-    Assert.Equal(CharacterClass.Warrior, berserker.Class)
-    Assert.Equal(CombatStance.PowerStance, berserker.Stance)
-    Assert.Contains("Greatsword", berserker.EquippedItems.Head.Name)
-    Assert.True(berserker.EquippedItems |> List.exists (fun it -> it.Name = "Sharpened Caltrops"))
-
-    let duelist = StoryBosses.createProloguePlayer "duelist"
-    Assert.Equal(CharacterClass.Rogue, duelist.Class)
-    Assert.Equal(CombatStance.AgilityStance, duelist.Stance)
-    Assert.Contains("Rapier", duelist.EquippedItems.Head.Name)
-
-    let warden = StoryBosses.createProloguePlayer "warden"
-    Assert.Equal(CharacterClass.Warrior, warden.Class)
-    Assert.Equal(CombatStance.PowerStance, warden.Stance)
-    Assert.Contains("Buckler", warden.EquippedItems.Head.Name)
-
-    let inquisitor = StoryBosses.createProloguePlayer "inquisitor"
-    Assert.Equal(CharacterClass.Mage, inquisitor.Class)
-    Assert.Equal(CombatStance.PowerStance, inquisitor.Stance)
-    Assert.Contains("Staff", inquisitor.EquippedItems.Head.Name)
-
-    let mesmer = StoryBosses.createProloguePlayer "mesmer"
-    Assert.Equal(CharacterClass.Mage, mesmer.Class)
-    // Every legacy arcane archetype key resolves to a Mage, whose baseline vector is Power
-    Assert.Equal(CombatStance.PowerStance, mesmer.Stance)
-    Assert.Contains("Mirror", mesmer.EquippedItems.Head.Name)
-
-    let abjurer = StoryBosses.createProloguePlayer "abjurer"
-    Assert.Equal(CharacterClass.Mage, abjurer.Class)
-    Assert.Equal(CombatStance.PowerStance, abjurer.Stance)
-    Assert.Contains("Tome", abjurer.EquippedItems.Head.Name)
+    // The six legacy weapon kits are deleted (ADR f1f14149): every legacy key now falls through to
+    // the Fighter kit rather than awakening a distinct class.
+    let legacy = StoryBosses.createProloguePlayer "warden"
+    Assert.Equal(CharacterClass.Fighter, legacy.Class)
+    Assert.Equal("Tempered Arming Sword", legacy.EquippedItems.Head.Name)
 
   [<Fact>]
   let ``Player defeat rewinds position and restores vitals while preserving earned souls, trophies, and quests`` () =
@@ -252,26 +226,22 @@ module StorySpatialTests =
 
   [<Fact>]
   let ``Prologue player wakes at level 1 with class weapons and caltrops folded into base stats`` () =
-    let berserker = StoryBosses.createProloguePlayer "berserker"
-    let duelist = StoryBosses.createProloguePlayer "duelist"
-    let warden = StoryBosses.createProloguePlayer "warden"
-    let inquisitor = StoryBosses.createProloguePlayer "inquisitor"
-    let mesmer = StoryBosses.createProloguePlayer "mesmer"
-    let abjurer = StoryBosses.createProloguePlayer "abjurer"
+    let fighter = StoryBosses.createProloguePlayer "fighter"
+    let mage = StoryBosses.createProloguePlayer "mage"
 
     // The story now opens as a level-1 recruit, not a Veteran.
-    for player in [ berserker; duelist; warden; inquisitor; mesmer; abjurer ] do
+    for player in [ fighter; mage ] do
       Assert.Equal(1, player.Level)
 
     // Starting weapon and caltrops bonuses are real, folded into the base stats at creation. They are
     // percentages of the stat they land on (the number in brackets is what they were as flat points
     // on the level-1 scale), so they keep mattering as attributes grow. Both planes share one level-1
     // primary of 45 now, so a caster's Intellect starts where a fighter's Force does.
-    Assert.Equal(70, berserker.Stats.Get StatId.Force) // 45 + greatsword 56% (was 25)
-    Assert.Equal(45, berserker.Stats.Get StatId.Reflex) // 34 + caltrops 33% (was 15)
-    Assert.Equal(85, duelist.Stats.Get StatId.Finesse) // 45 + stiletto 56% then caltrops 22%
-    Assert.Equal(65, warden.Stats.Get StatId.Fortitude) // 45 + buckler 44% (was 20)
-    Assert.Equal(70, inquisitor.Stats.Get StatId.Intellect) // 45 + staff 56% (was 25)
+    Assert.Equal(65, fighter.Stats.Get StatId.Force) // 45 + sword 44% (+20)
+    Assert.Equal(65, fighter.Stats.Get StatId.Fortitude) // 45 + shield 44% (+20)
+    Assert.Equal(73, fighter.Stats.Get StatId.Reflex) // 45 + shield 22% (+10) -> 55, then caltrops 33% (+18)
+    Assert.Equal(70, mage.Stats.Get StatId.Intellect) // 45 + staff 56% (+25)
+    Assert.Equal(65, mage.Stats.Get StatId.Resolve) // 45 + robes 44% (+20)
 
   [<Fact>]
   let ``Stage 1 grinding mobs mix woodland creatures and bandits ahead of the Bandit Leader`` () =

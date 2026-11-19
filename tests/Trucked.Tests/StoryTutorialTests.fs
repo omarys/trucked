@@ -15,23 +15,11 @@ module StoryTutorialTests =
   [<Theory>]
   [<InlineData("fighter")>]
   [<InlineData("mage")>]
-  [<InlineData("berserker")>]
-  [<InlineData("duelist")>]
-  [<InlineData("warden")>]
-  [<InlineData("inquisitor")>]
-  [<InlineData("mesmer")>]
-  [<InlineData("abjurer")>]
   let ``Tutorial protagonist starts at level 1 with canonical class stats and real gear bonuses`` (className: string) =
     let player = StoryBosses.createProloguePlayer className
     let expectedClass =
       match className with
       | "fighter" -> CharacterClass.Fighter
-      | "mage" -> CharacterClass.Mage
-      | "berserker" -> CharacterClass.Warrior
-      | "duelist" -> CharacterClass.Rogue
-      | "warden" -> CharacterClass.Warrior
-      | "mesmer" -> CharacterClass.Mage
-      | "abjurer" -> CharacterClass.Mage
       | _ -> CharacterClass.Mage
     Assert.Equal("PlayerCharacter", player.Name)
     Assert.Equal(1, player.Level)
@@ -64,7 +52,7 @@ module StoryTutorialTests =
 
   [<Fact>]
   let ``Picking up an item permanently raises the relevant stat and stores it in inventory`` () =
-    let player = StoryBosses.createProloguePlayer "berserker"
+    let player = StoryBosses.createProloguePlayer "fighter"
     let state = TowerSession.initSessionWithMode player 42 1 true
 
     let reflexBefore = state.Player.Stats.Get StatId.Reflex
@@ -145,7 +133,7 @@ module StoryTutorialTests =
 
   [<Fact>]
   let ``Clearing every floor 1 enemy levels the protagonist for floor 2`` () =
-    let player = StoryBosses.createProloguePlayer "berserker"
+    let player = StoryBosses.createProloguePlayer "fighter"
     let state = TowerSession.initSessionWithMode player 42 1 true
     Assert.Equal(1, state.Player.Level)
 
@@ -172,7 +160,7 @@ module StoryTutorialTests =
     // Per-kill experience (~0.3 levels per floor after the tutorial) cannot keep pace with the story
     // curve, so each stage's keystone guardian grants the level the next biome's monsters assume.
     // The ramp lands on the Veteran threshold for the tower, whatever the stat curve puts that at.
-    let player = StoryBosses.createProloguePlayer "berserker"
+    let player = StoryBosses.createProloguePlayer "fighter"
     let mutable state = TowerSession.initSessionWithMode player 4242 1 true
 
     let gateLevels =
@@ -198,7 +186,7 @@ module StoryTutorialTests =
 
   [<Fact>]
   let ``Tutorial enemies cannot one-shot the level-1 protagonist`` () =
-    let player = StoryBosses.createProloguePlayer "berserker"
+    let player = StoryBosses.createProloguePlayer "fighter"
     let floor = TowerGenerator.generateFloorWithMode 42 1 true
 
     // The tutorial guard applies to every floor-1 enemy, including the Bandit Leader.
@@ -223,7 +211,7 @@ module StoryTutorialTests =
 
   [<Fact>]
   let ``Lyra only completes the rescue quest after the Bandit Leader is defeated`` () =
-    let player = StoryBosses.createProloguePlayer "warden"
+    let player = StoryBosses.createProloguePlayer "fighter"
     let state = TowerSession.initSessionWithMode player 42 1 true
 
     let lyraPos =

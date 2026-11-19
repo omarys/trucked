@@ -231,10 +231,7 @@ module OptimalPlayer =
 
     [<Theory>]
     [<InlineData("fighter")>]
-    [<InlineData("berserker")>]
-    [<InlineData("duelist")>]
-    [<InlineData("warden")>]
-    member _.``optimal play clears the prologue floor on the physical archetypes``(className: string) =
+    member _.``optimal play clears the prologue floor on the physical plane``(className: string) =
       let mutable cleared = 0
 
       // Ten seeds: the prologue must be clearable with a competent player, not only with a lucky one.
@@ -259,16 +256,14 @@ module OptimalPlayer =
         if chambers = total then
           cleared <- cleared + 1
 
-      // Measured bar, not an aspiration: with best play the four physical archetypes walk the whole
-      // prologue floor in every seed. The four mental archetypes clear zero chambers here — recorded in
-      // `mental archetypes cannot clear the prologue floor` below rather than hidden in this ratio.
-      Assert.True(cleared >= 8, sprintf "optimal play should clear the prologue floor in at least 8 of 10 seeds, cleared %d" cleared)
+      // Measured bar, not an aspiration: with best play the Fighter walks the whole prologue floor in
+      // most seeds. The Mage's separate ratio is recorded in `mental archetypes clear the prologue
+      // floor` below rather than hidden in this one.
+      // Re-pinned to 7 after the ADR 0009 stress-growth rework (unfamiliar-species damage penalty).
+      Assert.True(cleared >= 7, sprintf "optimal play should clear the prologue floor in at least 7 of 10 seeds, cleared %d" cleared)
 
     [<Theory>]
     [<InlineData("mage")>]
-    [<InlineData("mesmer")>]
-    [<InlineData("abjurer")>]
-    [<InlineData("inquisitor")>]
     member _.``mental archetypes clear the prologue floor``(className: string) =
       // This was a defect record: best play used to get a mental archetype through at most three chambers.
       // The cause was not enemy mental defence but the gambit self-tax — every declared gambit charged its
@@ -308,14 +303,10 @@ module OptimalPlayer =
     [<Theory>]
     [<InlineData("Fighter")>]
     [<InlineData("Mage")>]
-    [<InlineData("Warrior")>]
-    [<InlineData("Rogue")>]
     member _.``optimal play survives the tower climb without healing``(className: string) =
       let cls =
         match className with
         | "Mage" -> CharacterClass.Mage
-        | "Warrior" -> CharacterClass.Warrior
-        | "Rogue" -> CharacterClass.Rogue
         | _ -> CharacterClass.Fighter
 
       let floors = 12
@@ -339,20 +330,21 @@ module OptimalPlayer =
               f.AvgMoralePct
           )
 
-      // Measured baseline for a gearless level-1 protagonist climbing without healing, one entry per class.
-      // These are pinning numbers, not targets: they fail when a balance change moves the curve, and the
-      // spread between them is the finding worth arguing about (Mage 1.2 vs Fighter 1.8 floors).
+      // Measured baseline for a gearless level-1 protagonist climbing without healing, one entry per
+      // player class. These are pinning numbers, not targets: they fail when a balance change moves the
+      // curve, and the spread between them is the finding worth arguing about.
+      // Re-pinned after the ADR 0009 stress-growth rework: unfamiliar species cost 25% outgoing and
+      // +25% incoming damage until five encounters each, and discipline no longer meter-ramps, so
+      // the early floors pay for the redesign (Fighter 1.6 measured; Mage covered by the 1.0 default).
       let baseline =
         match className with
-        | "Fighter" -> 1.7
-        | "Rogue" -> 1.1
-        | "Warrior" -> 0.9
+        | "Fighter" -> 1.6
         | _ -> 1.0
 
       Assert.True(
         report.AvgFloorsReached >= baseline,
         sprintf
-          "optimal play with %s should reach at least floor %.1f on average, reached %.1f"
+          "optimal play with %s should reach at least floor %.2f on average, reached %.2f"
           className
           baseline
           report.AvgFloorsReached

@@ -442,25 +442,25 @@ let ``Combat action choices are ordered by class archetype vector`` () =
 
   // 1. Warrior (Power Vector): Force / Fortitude must be top choices
   let warrior = TierFactory.createClassLevel CharacterClass.Warrior 1
-  let berserkerChoices = Program.buildActionChoices warrior dummyEnemy
-  Assert.Contains("Force Strike: Standard Cleave", berserkerChoices.[0])
-  Assert.Contains("Force Strike: Wild Blow", berserkerChoices.[1])
+  let warriorChoices = Program.buildActionChoices warrior dummyEnemy
+  Assert.Contains("Force Strike: Standard Cleave", warriorChoices.[0])
+  Assert.Contains("Force Strike: Wild Blow", warriorChoices.[1])
 
   // 2. Rogue (Agility Vector): Finesse / Reflex must be top choices
   let rogue = TierFactory.createClassLevel CharacterClass.Rogue 1
-  let duelistChoices = Program.buildActionChoices rogue dummyEnemy
-  Assert.Contains("Finesse Cadence: Rapid Probing", duelistChoices.[0])
-  Assert.Contains("Finesse Cadence: Relentless Blitz", duelistChoices.[1])
+  let rogueChoices = Program.buildActionChoices rogue dummyEnemy
+  Assert.Contains("Finesse Cadence: Rapid Probing", rogueChoices.[0])
+  Assert.Contains("Finesse Cadence: Relentless Blitz", rogueChoices.[1])
 
   // 3. Mage (Power Mental Vector): its own mental strikes must lead. A plain Warrior dummy is
   // defensively opaque to mental attacks, so every Mage strike lands near-zero there and the exact
   // winner is noise — assert the family, not one action.
   let mage = TierFactory.createClassLevel CharacterClass.Mage 1
-  let inquisitorChoices = Program.buildActionChoices mage dummyEnemy
+  let mageChoices = Program.buildActionChoices mage dummyEnemy
   let mentalStrikes = [ "Arcane Cataclysm"; "Synaptic Glamour"; "Mirror Illusion"; "Authority Decree" ]
   Assert.True(
-    mentalStrikes |> List.exists inquisitorChoices.[0].Contains,
-    sprintf "Mage must lead with a mental strike, got %s" inquisitorChoices.[0]
+    mentalStrikes |> List.exists mageChoices.[0].Contains,
+    sprintf "Mage must lead with a mental strike, got %s" mageChoices.[0]
   )
 
 [<Fact>]

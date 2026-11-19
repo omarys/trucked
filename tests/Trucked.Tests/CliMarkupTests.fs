@@ -104,15 +104,10 @@ module CliMarkupTests =
   [<Fact>]
   let ``Battered chest prompt title and choices parse and render cleanly in SelectionPrompt`` () =
     let title =
-      sprintf "[bold %s]⌹ SCAVENGING THE BATTERED CHEST (Lock Broken)[/]\n[italic %s]Choose your weapon armament and awaken your class:[/]"
-        Theme.Yellow Theme.Comment
+      sprintf "[bold %s]Scavenge the battered chest (Choose your combat plane):[/]" Theme.Yellow
     let choices =
-      [ "🗡️ Two-handed Greatsword (Berserker) — Ferocious momentum, sweeping cleaves & high force"
-        "🤺 Paired Stiletto & Rapier (Duelist) — Fencing precision, high reflex, agile cadences"
-        "🛡️ Arming Sword & Reinforced Shield (Warden) — Bastion defense, fortress poise, counterplay"
-        "🪄 Carved Ash Staff (Inquisitor) — Arcane resonance, psionic intellect, mental clarity"
-        "🪞 Silvered Hand Mirror (Mesmer) — Phantasmal decoys, mirror clones & sensory static"
-        "📖 Dusty Tome (Abjurer) — Runic wards, composure barriers & destabilizing runes"
+      [ "⚔️ Physical — Tempered Arming Sword & Reinforced Shield: a martial master of kinetic momentum, agile parries, and bastion guard"
+        "🪄 Mental — Carved Ash Staff & Runic Robes: an arcane practitioner channeling cognitive resonance, phantasmal static, and protective wards"
         Display.HelpChoiceLabel ]
     let m = Markup(title)
     Assert.NotNull(m)
@@ -122,7 +117,7 @@ module CliMarkupTests =
   [<Fact>]
   let ``All Tower encounter prompt titles parse cleanly in Markup without unbalanced stack`` () =
     let titles = [
-      sprintf "[bold %s]⌹ SCAVENGING THE BATTERED CHEST (Lock Broken)[/]\n[italic %s]Choose your weapon armament and awaken your class:[/]" Theme.Yellow Theme.Comment
+      sprintf "[bold %s]Scavenge the battered chest (Choose your combat plane):[/]" Theme.Yellow
       sprintf "[bold red]󰈸 %s blocks your path: %s![/]" "TRAUMA MANIFESTATION" "Aspect of Guilt"
       sprintf "[bold %s]♨ %s[/]\n[italic %s]%s[/]\n[bold %s]Cost: %s[/]  ──>  [bold %s]Reward: %s[/]" Theme.Purple "Altar" Theme.Comment "Desc" Theme.Red "Cost" Theme.Green "Reward"
       sprintf "[bold %s]󱁠 %s, %s[/]\n[italic %s]\"%s\"[/]\n[bold gold1]Your Souls: %d[/]" Theme.Cyan "Merchant" "Title" Theme.Comment "Dialogue" 100
@@ -134,7 +129,8 @@ module CliMarkupTests =
 
   [<Fact>]
   let ``Combat action choices for all classes against all monsters parse cleanly in Markup without style errors`` () =
-    let classes = [ "berserker"; "duelist"; "warden"; "inquisitor"; "mesmer"; "abjurer" ]
+    // Only two player characters exist (ADR f1f14149): Fighter and Mage.
+    let classes = [ "fighter"; "mage" ]
     let enemies = [
       Bestiary.slagHound.ToCombatant (CombatantId.New())
       Bestiary.stoneGargoyle.ToCombatant (CombatantId.New())
@@ -158,7 +154,7 @@ module CliMarkupTests =
     let enemy = Bestiary.slagHound.ToCombatant (CombatantId.New())
 
     let slipped =
-      { StoryBosses.createProloguePlayer "berserker" with
+      { StoryBosses.createProloguePlayer "fighter" with
           Tempo = TacticalTiming.Nach
           Stance = CombatStance.AgilityStance }
 
@@ -183,7 +179,7 @@ module CliMarkupTests =
           IsStaggered = true }
 
     let player =
-      { StoryBosses.createProloguePlayer "berserker" with
+      { StoryBosses.createProloguePlayer "fighter" with
           Tempo = TacticalTiming.Vor
           Momentum = 4
           Preparations =
@@ -195,8 +191,11 @@ module CliMarkupTests =
       Assert.NotNull(Markup(choice))
 
     let prepChoices = choices |> List.filter (fun c -> c.Contains("Deploy Prep:"))
-    Assert.Equal(2, prepChoices.Length)
+    // The available kit narrows to the active stance: the fighter stands in Power Stance, so the
+    // Agility-grounded Concealed Blade is filtered out and only the Power kit is offered.
+    Assert.Equal(1, prepChoices.Length)
     Assert.Equal(Fornach.Engine.ActionIntent.DeployPreparation(PreparationType.ShockwaveSlam, None), Program.parseActionChoice prepChoices.[0])
+    Assert.False(prepChoices |> List.exists (fun c -> c.Contains("Concealed Blade")))
 
     let pressChoices = choices |> List.filter (fun c -> c.Contains("PRESS THE ADVANTAGE"))
     Assert.NotEmpty(pressChoices)

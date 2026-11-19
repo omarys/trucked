@@ -123,6 +123,11 @@ module Archetypes =
       Factory = createNoviceMage }
   ]
 
+  // Player-facing roster (ADR f1f14149): only Fighter and Mage archetypes are playable champions.
+  // Generic NPC archetypes (Warrior, Rogue) remain selectable as opponents in benchmark modes.
+  let playerArchetypes : ArchetypeInfo list =
+    allArchetypes |> List.filter (fun a -> a.Name <> "Warrior" && a.Name <> "Rogue")
+
   let findByName (name: string) : ArchetypeInfo option =
     let trimmed = name.Trim().ToLowerInvariant()
     allArchetypes
@@ -134,5 +139,16 @@ module Archetypes =
   let createCustom (name: string) (hp: int) (morale: int) (armor: int) (stats: (StatId * int) seq) : Combatant =
     let id = CombatantId.New()
     let statBlock = StatBlock.Create stats
-    { Combatant.create id name hp morale statBlock with
+    let stat k = statBlock.Get k
+    // ADR f1f14149: the class label is derived from the stat distribution, never chosen —
+    // physical stats dominant means Fighter, mental stats dominant means Mage.
+    let derivedClass =
+      if stat StatId.Force + stat StatId.Prowess >= stat StatId.Intellect + stat StatId.Acumen then
+        CharacterClass.Fighter
+      else
+        CharacterClass.Mage
+    let baseC = Combatant.create id name hp morale statBlock
+    { baseC with
+        Class = derivedClass
+        Progression = ProgressionProfile.create derivedClass 1
         Armor = ArmorIntegrity.Create armor }

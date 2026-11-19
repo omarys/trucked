@@ -85,7 +85,7 @@ module BalanceRegressionTests =
 
   [<Fact>]
   let ``level-up preserves hand-authored stats and adds growth`` () =
-    let protagonist = StoryBosses.createProloguePlayer "berserker" // Lv35, hand-authored Force 210
+    let protagonist = StoryBosses.createProloguePlayer "fighter" // level-1 Fighter kit, sword-folded Force
     let forceBefore = protagonist.Stats.Get Force
 
     let leveled = TierFactory.rescaleToLevel protagonist 36

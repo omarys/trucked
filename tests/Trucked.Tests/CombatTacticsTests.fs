@@ -90,7 +90,7 @@ module CombatTacticsTests =
     Assert.True(degraded, "a Discipline Stance slam should emit WeaponDegraded")
 
   [<Fact>]
-  let ``Raise Shield fortifies armor soak and feeds the ramp`` () =
+  let ``Raise Shield hold sets plating, banks guard stacks, and cedes the Vor`` () =
     let damagedPlayer =
       let p = TierFactory.createClassLevel CharacterClass.Fighter 30
       { p with Armor = { p.Armor with Current = 10 }; PlayerStyle = true }
@@ -99,20 +99,28 @@ module CombatTacticsTests =
     let dummyTarget = TierFactory.createClassLevel CharacterClass.Warrior 30
     let roller = fixedRoller 4
 
-    let intent = ActionIntent.RecoveryAction DefensiveReset.RaiseShield
-    let result = ActionResolver.resolve roller intent damagedPlayer dummyTarget
+    // The merged hold: Raise Shield and Wait are one action now, so the engine routes Wait to the
+    // Fighter's reset while ceding the Vor.
+    let result = ActionResolver.resolve roller ActionIntent.Wait damagedPlayer dummyTarget
 
-    Assert.True(result.Actor.Armor.Current > damagedPlayer.Armor.Current, "Raise shield should restore armor integrity")
-    // Every swing raises both ramps, so a raised shield leaves them level with each other.
-    Assert.True(result.Actor.Flow >= 2, "Raise shield should feed the Flow ramp")
-    Assert.Equal(result.Actor.Flow, result.Actor.Momentum)
+    // A raised shield is plating held in front of the armor, not a repair: durability stays chewed
+    // (kits and shrines repair it), and the boost takes the bite instead.
+    Assert.Equal(damagedPlayer.Armor.Current, result.Actor.Armor.Current)
+    Assert.True(result.Actor.Armor.Boost > 0, "Raise shield should boost armor as held plating")
+    // The guard stacks are the Poise build: Inertia/Focus scale Poise (and Fortitude).
+    Assert.True(result.Actor.Inertia >= 2, "Raise shield should bank guard stacks")
+    Assert.Equal(result.Actor.Inertia, result.Actor.Focus)
     Assert.True(result.Actor.Meters.Recklessness.Value < damagedPlayer.Meters.Recklessness.Value, "Raise shield should bleed recklessness")
+    // Holding the round gives the Vor away: the foe moves while the shield is up.
+    Assert.True(result.Target.IsInVor, "holding the round should cede the Vor to the foe")
+    Assert.False(result.Actor.IsInVor)
 
     let raisedEvt =
       result.Events
       |> List.tryPick (function CombatEvent.ShieldRaised(_, armor, stacks) -> Some(armor, stacks) | _ -> None)
 
     Assert.True(raisedEvt.IsSome, "ShieldRaised combat event should be emitted")
+    Assert.Equal(result.Actor.Armor.Boost, raisedEvt.Value |> fst)
 
   [<Fact>]
   let ``Staff Siphon strikes Morale and siphons Cognitive Fatigue and Recklessness back to caster`` () =

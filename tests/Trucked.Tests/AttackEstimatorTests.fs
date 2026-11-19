@@ -55,15 +55,21 @@ let ``each strike scales with its own meter`` () =
         Stats = baseTarget.Stats.With(Fortitude, 1).With(Reflex, 1).With(Poise, 1) }
   let charged = { fighter with Flow = 5; Momentum = 5 }
 
-  // Flow and Momentum are read by GetCombatStat, so a charged pile must raise every vector's strike.
+  // Flow and Momentum are read by GetCombatStat, so a charged pile raises the Power/Agility vectors.
   for attack in
     [ AttackClassification.ForceStrike false
-      AttackClassification.FinesseCadence false
-      AttackClassification.ProwessStrike false ] do
+      AttackClassification.FinesseCadence false ] do
     Assert.True(
       AttackEstimator.estimate charged target attack > AttackEstimator.estimate fighter target attack,
       sprintf "%A must scale with its own meter" attack
     )
+
+  // Discipline must be earned (ADR 0009 stress growth): no meter ramps Prowess, so charging
+  // both meters leaves the discipline vector flat.
+  Assert.Equal(
+    AttackEstimator.estimate fighter target (AttackClassification.ProwessStrike false),
+    AttackEstimator.estimate charged target (AttackClassification.ProwessStrike false)
+  )
 
 [<Fact>]
 let ``a flagged strike variant estimates higher than its plain form`` () =

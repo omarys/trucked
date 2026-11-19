@@ -1661,7 +1661,9 @@ module TowerDisplay =
                 else
                   onDefeatAnimation()
                   // Rewind: restore the player and put every non-boss mob back where it spawned, undamaged.
-                  state <- traumaReset state
+                  // The returned player carries defeat growth (+10 discipline); writing it in first keeps
+                  // the scars through the reset, which restores pools but preserves Stats and Progression.
+                  state <- traumaReset { state with Player = updatedPlayer }
                   state <-
                     { state with
                         MessageLog = "Truck-kun strikes! Rewound through the trauma loop. You awaken at the entrance. All souls, trophies, and gear preserved!" :: state.MessageLog }
@@ -1696,7 +1698,7 @@ module TowerDisplay =
 
                 if simPlayer.Health.IsDepleted || CollapseState.isCollapsed simPlayer.Collapse then
                   onDefeatAnimation()
-                  state <- traumaReset state
+                  state <- traumaReset { state with Player = Combatant.growFromDefeat simPlayer }
                   state <-
                     { state with
                         MessageLog = sprintf "Truck-kun strikes! Overwhelmed during quick resolve against %s. Rewound to entrance." enemy.Name :: state.MessageLog }
@@ -1704,7 +1706,10 @@ module TowerDisplay =
                   AnsiConsole.MarkupLine(sprintf "\n[bold red]Trauma loop reset! Overwhelmed during quick resolve. Rewound to entrance.[/]")
                   Thread.Sleep(1200)
                 else
-                  let grownPlayer = Combatant.growFromEncounter [ simEnemy ] simPlayer
+                  let grownPlayer =
+                    simPlayer
+                    |> Combatant.growFromEncounter [ simEnemy ]
+                    |> Combatant.growFromStressedVictory
                   state <- { state with Player = grownPlayer }
                   state <- TowerSession.resolveEnemyDefeat enemy.Id state
                   state <-
@@ -1736,7 +1741,7 @@ module TowerDisplay =
 
                 if withdrawn.Health.IsDepleted || CollapseState.isCollapsed withdrawn.Collapse then
                   onDefeatAnimation()
-                  state <- traumaReset state
+                  state <- traumaReset { state with Player = Combatant.growFromDefeat withdrawn }
                   state <-
                     { state with
                         MessageLog =

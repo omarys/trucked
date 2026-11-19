@@ -576,7 +576,7 @@ module Display =
         "Discipline"
     | Wait ->
       sprintf "⏸️ [bold %s]Wait (Held Round)[/]" Theme.Yellow,
-      "Holding the round: venting strain and giving up the initiative.",
+      "Holding the round: taking the bearer's own defensive reset and ceding the initiative.",
       "Press the advantage while the guard is passive!",
       "Defensive"
     | RecoveryAction SteadyForm ->
@@ -585,8 +585,8 @@ module Display =
       "Seize the opening with an aggressive strike!",
       "Defensive"
     | RecoveryAction RaiseShield ->
-      sprintf "🛡️ [bold %s]Raise Shield (Bastion Posture)[/]" Theme.Green,
-      "Tucking behind the shield to restore armor and prepare counter-ripostes.",
+      sprintf "🛡️ [bold %s]Raise Shield (Bastion Hold)[/]" Theme.Green,
+      "Holding the shield up: armor boosted as plating and guard braced for the riposte.",
       "Break guard with heavy Power cleave!",
       "Defensive"
     | RecoveryAction CenterMind ->
@@ -938,7 +938,7 @@ module Display =
       AnsiConsole.MarkupLine(sprintf "  [bold %s]✖ GAMBIT PUNISHED:[/] %s" Theme.Red reason)
 
     | CombatEvent.FormStabilized (_, drained, gained) ->
-      AnsiConsole.MarkupLine(sprintf "  [bold %s]✓ FORM STABILIZED:[/] Drained [bold %s]%d Recklessness[/], gained [bold %s]%d ramp stacks[/]." Theme.Green Theme.Green drained Theme.Purple gained)
+      AnsiConsole.MarkupLine(sprintf "  [bold %s]✓ FORM STABILIZED:[/] Drained [bold %s]%d Recklessness[/], gained [bold %s]%d guard stacks[/]." Theme.Green Theme.Green drained Theme.Purple gained)
 
     | CombatEvent.BreathStabilized (_, summary, morale) ->
       AnsiConsole.MarkupLine(sprintf "  [bold %s]🌬 STEADY BREATHING:[/] %s (+[bold %s]%d Morale[/])." Theme.Cyan summary Theme.Green morale)
@@ -1115,7 +1115,10 @@ module Display =
       AnsiConsole.MarkupLine(sprintf "  [bold %s]✨ STAFF SIPHON:[/] Siphoned mental clarity (-%d Fatigue, -%d Recklessness) and reinforced Arcane Ward (+%d Barrier)!" Theme.Cyan fatigue reck ward)
 
     | CombatEvent.ShieldRaised (_, armor, stacks) ->
-      AnsiConsole.MarkupLine(sprintf "  [bold %s]🛡️ BASTION SHIELD:[/] Fortified armor soak (+%d Armor) and braced stance (+%d ramp stacks)!" Theme.Green armor stacks)
+      AnsiConsole.MarkupLine(sprintf "  [bold %s]🛡️ BASTION SHIELD:[/] Plating held up (+%d Armor Boost) and guard braced (+%d guard stacks)!" Theme.Green armor stacks)
+
+    | CombatEvent.GuardSteeled (_, stacks) ->
+      AnsiConsole.MarkupLine(sprintf "  [bold %s]🛡️ GUARD STEELED:[/] Poise/Composure sharpened through the successful defence (+%d Guard Stack)!" Theme.Cyan stacks)
 
     | CombatEvent.PainShockSuffered (_, dmg, pct, poise, resisted) ->
       if resisted then

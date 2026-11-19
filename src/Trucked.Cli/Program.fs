@@ -41,7 +41,7 @@ module Program =
     AnsiConsole.Write(telemetryPanel)
     AnsiConsole.WriteLine()
 
-  let private promptSelectArchetype (title: string) : ArchetypeInfo =
+  let private promptSelectArchetype (title: string) (roster: ArchetypeInfo list) : ArchetypeInfo =
     let prompt =
       SelectionPrompt<ArchetypeInfo>()
         .Title(title)
@@ -56,7 +56,7 @@ module Program =
           sprintf "[bold %s][[%A]][/] [bold %s]󰀝 %-22s[/] ([%s]%A[/]) ── [%s]%s[/]"
             tierColor a.Tier Theme.Foreground a.Name Theme.Pink a.Discipline Theme.Comment a.Description)
 
-    prompt.AddChoices(Archetypes.allArchetypes) |> ignore
+    prompt.AddChoices(roster) |> ignore
     Display.promptWithVim prompt
 
   let parseActionChoice (choice: string) : ActionIntent =
@@ -153,8 +153,6 @@ module Program =
       DeployPreparation (PreparationType.PrismaticFlare, None)
     elif choice.Contains("Deploy Prep: Bastion Zone Control") then
       DeployPreparation (PreparationType.BastionZoneControl, None)
-    elif choice.Contains("Deploy Prep: Parrying Buckler") then
-      DeployPreparation (PreparationType.ParryingBuckler, None)
     elif choice.Contains("Deploy Prep: Aegis of Retribution") then
       DeployPreparation (PreparationType.AegisOfRetribution, None)
     elif choice.Contains("Deploy Prep: Heraldic Treatise") then
@@ -178,7 +176,7 @@ module Program =
     elif choice.Contains("Thread Form: Aegis Lattice") then
       ThreadComplexForm ComplexForm.AegisLattice
     elif choice.Contains("Raise Shield") then
-      RecoveryAction RaiseShield
+      Wait
     elif choice.Contains("Wait") then
       Wait
     elif choice.Contains("Center Mind") then
@@ -212,7 +210,6 @@ module Program =
       | MirrorMirage -> "Flankers strike illusions (+20 Confusion & lose action)"
       | PrismaticFlare -> "Blinding burst: enemy Recklessness spikes trigger Morale shock"
       | BastionZoneControl -> "Plant polearm/shield: cap simultaneous attackers to 3"
-      | ParryingBuckler -> "Widen Indes counter window by -1 threshold"
       | AegisOfRetribution -> "-35% damage taken & reflect 50% back as radiant damage"
       | HeraldicTreatise -> "Grant +2 Combat Ramp across all engaged foes"
       | SocraticDossier -> "Convert target's Recklessness into unmitigated Morale damage"
@@ -231,7 +228,11 @@ module Program =
       else player.Progression.Preparations
     let availablePreps =
       prepSource
-      |> List.filter (fun s -> s.RemainingUses > 0 && not (player.HasActivePreparation s.Type))
+      |> List.filter (fun s ->
+        s.RemainingUses > 0
+        && not (player.HasActivePreparation s.Type)
+        // Only the kit grounded in the active stance can be readied while that stance is held.
+        && s.Type.Stance = player.Stance)
 
     let pressAdvTag =
       if enemy.IsStaggered then sprintf " [bold %s]★ PRESS THE ADVANTAGE (Target Staggered!)[/]" Theme.Green
@@ -275,7 +276,9 @@ module Program =
           let powTag = if atk.Vector = Vector.Discipline then sprintf " [bold %s]★ Guard Break[/]" Theme.Red else ""
           let agiTag = if atk.Vector = Vector.Power then sprintf " [bold %s]★ Counter-Evasion[/]" Theme.Green else ""
           let disTag = if atk.Vector = Vector.Agility then sprintf " [bold %s]★ Bastion Counter[/]" Theme.Purple else ""
-          let rShieldTag = if atk.Vector = Vector.Agility then sprintf " [bold %s]★ Parry Opening[/]" Theme.Green else ""
+          // The merged hold widens the Indes window against every incoming vector while its plating is
+          // up -- the old buckler heuristic (Agility only) undersold the hold.
+          let rShieldTag = sprintf " [bold %s]★ Parry Opening (Widened Indes)[/]" Theme.Green
 
           powTag, agiTag, disTag, interruptBadge, rShieldTag
         | _ -> "", "", "", "", ""
@@ -328,10 +331,11 @@ module Program =
           let refCounterTag = if isCounterAgility then sprintf " [bold %s]★ Affinity Counter (Mitigates Finesse)[/]" Theme.Green else ""
           sprintf "🛡️  [%s]Fortitude Guard: Braced Guard[/] (Power Defense • Counter Force Strikes; +25%% mitigation, seize Vor)%s" Theme.Cyan fortCounterTag
           sprintf "🛡️  [%s]Reflex Slip: Evasive Slip[/] (Agility Defense • Counter Finesse Cadences; +25%% mitigation, seize Vor)%s" Theme.Green refCounterTag
-          for slot in availablePreps |> List.filter (fun s -> s.Type = ConcealedBlade || s.Type = ParryingBuckler || s.Type = CaltropPouch || s.Type = BastionZoneControl) do
+          for slot in availablePreps |> List.filter (fun s -> s.Type = ConcealedBlade || s.Type = CaltropPouch || s.Type = BastionZoneControl) do
             formatPrepOption slot
-          sprintf "🛡️  [bold %s]Raise Shield[/] (Bastion Posture: Repair Armor ~36%% of max, Gain 2 Combat Ramp, Bleed Recklessness)%s" Theme.Green raiseShieldTag
-          sprintf "⏸️  [%s]Wait[/] (Hold: vent all strain, restore Morale, build Combat Ramp — cedes the Vor, so you strike only if the foe provokes)" Theme.Green
+          // Raise Shield absorbed Wait for the physical disciplines: one hold that erects the shield
+          // plating, banks guard stacks, widens the Indes window, and cedes the Vor.
+          sprintf "🛡️  [bold %s]Raise Shield[/] (Bastion Hold: Boost Armor ~36%%+ of max as held plating (scales with Fortitude), Gain 2 Guard Stacks, Bleed Recklessness — cedes the Vor, so you strike only if the foe provokes)%s" Theme.Green raiseShieldTag
         else
           let resCounterTag = if isCounterPower then sprintf " [bold %s]★ Affinity Counter (Mitigates Power)[/]" Theme.Green else ""
           let intCounterTag = if isCounterAgility then sprintf " [bold %s]★ Affinity Counter (Mitigates Agility)[/]" Theme.Green else ""
@@ -376,11 +380,9 @@ module Program =
         for slot in availablePreps do
           formatPrepOption slot
 
-        // Active Armament Recovery: Shield Bastion Guard
-        sprintf "🛡️  [bold %s]Raise Shield[/] (Bastion Posture: Repair Armor ~36%% of max, Gain 2 Combat Ramp, Bleed Recklessness)%s" Theme.Green raiseShieldTag
-        // Wait: the held round, available to every discipline. It carries the same recovery as the old
-        // Steady Form, but it spends the whole turn and gives up the Vor, which is what makes it a pass.
-        sprintf "⏸️  [%s]Wait[/] (Hold: vent all strain, restore Morale, build Combat Ramp — cedes the Vor, so you strike only if the foe provokes)" Theme.Green
+        // Active Armament Recovery: the shield hold -- Raise Shield and Wait are one action for the
+        // physical disciplines, so there is no separate pass here.
+        sprintf "🛡️  [bold %s]Raise Shield[/] (Bastion Hold: Boost Armor ~36%%+ of max as held plating (scales with Fortitude), Gain 2 Guard Stacks, Bleed Recklessness — cedes the Vor, so you strike only if the foe provokes)%s" Theme.Green raiseShieldTag
 
       else
         // Arcane Spellcraft (Mental Characters in Vor or Indes)
@@ -925,6 +927,7 @@ module Program =
             |> Combatant.updateMeters (fun m -> { m with Recklessness = Meter.Zero })
             |> (fun p -> { p with Morale = p.Morale.ApplyDelta 20 })
             |> Combatant.growFromEncounter [ currentBoss ]
+            |> Combatant.growFromStressedVictory
           Display.logEvent (CombatEvent.BeastFled(currentBoss.Id, currentBoss.Name))
           Display.logEvent (CombatEvent.BeastSpared(currentCombatant.Id, currentBoss.Id))
           combatOver <- true
@@ -935,6 +938,7 @@ module Program =
             currentCombatant
             |> Combatant.updateMeters (fun m -> { m with Recklessness = m.Recklessness + 15 })
             |> Combatant.growFromEncounter [ currentBoss ]
+            |> Combatant.growFromStressedVictory
           Display.logEvent (CombatEvent.BeastExecuted(currentCombatant.Id, currentBoss.Id))
           combatOver <- true
           outcome <- CombatOutcome.PlayerVictorious
@@ -999,7 +1003,10 @@ module Program =
           if playerExecutedEnemy || currentBoss.Health.IsDepleted || currentBoss.Morale.IsDepleted then
             combatOver <- true
             outcome <- CombatOutcome.PlayerVictorious
-            currentCombatant <- Combatant.growFromEncounter [ currentBoss ] currentCombatant
+            currentCombatant <-
+              currentCombatant
+              |> Combatant.growFromEncounter [ currentBoss ]
+              |> Combatant.growFromStressedVictory
             AnsiConsole.WriteLine()
             AnsiConsole.Write(
               Rule(sprintf "[bold %s]★★★ MANIFESTATION RESOLVED: %s PREVAILED! ★★★[/]" Theme.Green currentCombatant.Name)
@@ -1104,7 +1111,10 @@ module Program =
     AnsiConsole.WriteLine()
     AnsiConsole.MarkupLine(sprintf "[dim grey]Tactical combat log saved to: %s[/]" latestLog)
 
-    outcome, currentCombatant
+    // Defeat still grows the player (+10 discipline) - the caller writes this combatant into the run
+    // state before its trauma reset, which restores pools but keeps the scars.
+    outcome,
+    (if outcome = CombatOutcome.PlayerDefeated then Combatant.growFromDefeat currentCombatant else currentCombatant)
 
   /// Renders the multi-enemy engagement HUD: the full player panel on the left, a one-row-per-foe pack
   /// table on the right, and a combat-log pane spanning the bottom. The pack used to be one bordered
@@ -1572,7 +1582,16 @@ module Program =
       currentEnemies
       |> List.map (fun e -> if isLiving e then e else { e with IsDefeated = true })
 
-    { Outcome = outcome; Player = currentPlayer; Enemies = finalEnemies }
+    // Victory banks stress growth (+5 paid-for / +1 above half Recklessness); defeat banks the
+    // scar growth (+10). The caller writes this player into the run state before its trauma reset,
+    // which restores pools but keeps Stats and Progression.
+    let grownPlayer =
+      match outcome with
+      | TowerDisplay.GroupDuelOutcome.Victorious -> Combatant.growFromStressedVictory currentPlayer
+      | TowerDisplay.GroupDuelOutcome.Defeated -> Combatant.growFromDefeat currentPlayer
+      | TowerDisplay.GroupDuelOutcome.Fled -> currentPlayer
+
+    { Outcome = outcome; Player = grownPlayer; Enemies = finalEnemies }
 
   let private createProloguePlayer (className: string) : Combatant =
     StoryBosses.createProloguePlayer className
@@ -1602,21 +1621,22 @@ module Program =
     AnsiConsole.Write(introPanel)
     AnsiConsole.WriteLine()
 
-    // 2. Scavenger Chest Class Selection
+    // 2. Scavenger Chest Plane Selection — the only thing chosen is the combat plane; the class
+    // label (Fighter / Mage) is derived from the kit's stat distribution (ADR f1f14149).
     let choices =
-      [ "⚔️ Tempered Arming Sword & Reinforced Shield (Fighter) — Balanced martial master of kinetic momentum, agile parries, and bastion guard"
-        "🪄 Carved Ash Staff (Mage) — Arcane practitioner channeling cognitive resonance, phantasmal static, and protective wards" ]
+      [ "⚔️ Physical — Tempered Arming Sword & Reinforced Shield: a martial master of kinetic momentum, agile parries, and bastion guard"
+        "🪄 Mental — Carved Ash Staff & Runic Robes: an arcane practitioner channeling cognitive resonance, phantasmal static, and protective wards" ]
 
     let choice =
       Display.promptSelectionWithHelp
-        (sprintf "[bold %s]Scavenge the battered chest (Choose your weapon armament and awaken your class):[/]" Theme.Yellow)
+        (sprintf "[bold %s]Scavenge the battered chest (Choose your combat plane):[/]" Theme.Yellow)
         choices
         None
         (fun () -> ())
 
-    let chosenClass = if choice.Contains("Fighter") then "fighter" else "mage"
+    let chosenPlane = if choice.StartsWith("⚔️") then "physical" else "mental"
 
-    let player = StoryBosses.createProloguePlayer chosenClass
+    let player = StoryBosses.createProloguePlayer chosenPlane
     let weapon =
       player.EquippedItems
       |> List.map (fun w -> w.Name)
@@ -1771,27 +1791,27 @@ module Program =
             if choice.Contains("Interactive Story Mode") then
               runInteractiveStory debugOptions.Enabled debugOptions.ForcedSeed
             elif choice.Contains("Ascend The Infinite Tower") then
-              let playerArch = promptSelectArchetype (sprintf "[bold %s]Select Expedition Champion:[/]" Theme.Yellow)
+              let playerArch = promptSelectArchetype (sprintf "[bold %s]Select Expedition Champion:[/]" Theme.Yellow) Archetypes.playerArchetypes
               let player = playerArch.Factory()
               TowerDisplay.runTowerCrawl player 1 runStoryDuel runStoryGroupDuel DeathAnimation.playTruckReplay debugOptions.Enabled debugOptions.ForcedSeed
             elif choice.Contains("Interactive Duel Arena") then
-              let playerArch = promptSelectArchetype (sprintf "[bold %s]Select Player Combatant:[/]" Theme.Green)
-              let enemyArch = promptSelectArchetype (sprintf "[bold %s]Select Opponent Combatant:[/]" Theme.Pink)
+              let playerArch = promptSelectArchetype (sprintf "[bold %s]Select Player Combatant:[/]" Theme.Green) Archetypes.playerArchetypes
+              let enemyArch = promptSelectArchetype (sprintf "[bold %s]Select Opponent Combatant:[/]" Theme.Pink) Archetypes.allArchetypes
               runInteractiveDuel playerArch enemyArch
 
             elif choice.Contains("Monte-Carlo Balance Simulator (1 vs 1)") then
-              let archA = promptSelectArchetype (sprintf "[bold %s]Select Combatant A:[/]" Theme.Green)
-              let archB = promptSelectArchetype (sprintf "[bold %s]Select Combatant B:[/]" Theme.Pink)
+              let archA = promptSelectArchetype (sprintf "[bold %s]Select Combatant A:[/]" Theme.Green) Archetypes.allArchetypes
+              let archB = promptSelectArchetype (sprintf "[bold %s]Select Combatant B:[/]" Theme.Pink) Archetypes.allArchetypes
               runBalanceSimulator archA archB
 
             elif choice.Contains("1 vs N Encirclement Swarm Simulator") then
-              let soloArch = promptSelectArchetype (sprintf "[bold %s]Select Solo Champion:[/]" Theme.Green)
-              let mobArch = promptSelectArchetype (sprintf "[bold %s]Select Swarm Opponent Archetype:[/]" Theme.Pink)
+              let soloArch = promptSelectArchetype (sprintf "[bold %s]Select Solo Champion:[/]" Theme.Green) Archetypes.playerArchetypes
+              let mobArch = promptSelectArchetype (sprintf "[bold %s]Select Swarm Opponent Archetype:[/]" Theme.Pink) Archetypes.allArchetypes
               runGroupBalanceSimulator soloArch mobArch
 
             elif choice.Contains("Custom Combatant Builder") then
               let customArch = createCustomCombatantInteractive ()
-              let enemyArch = promptSelectArchetype (sprintf "[bold %s]Select Opponent to Test Against:[/]" Theme.Pink)
+              let enemyArch = promptSelectArchetype (sprintf "[bold %s]Select Opponent to Test Against:[/]" Theme.Pink) Archetypes.allArchetypes
               runInteractiveDuel customArch enemyArch
 
             elif choice.Contains("View Archetype Roster") then

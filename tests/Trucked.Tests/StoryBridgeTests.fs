@@ -40,17 +40,32 @@ let ``StoryRunner properly invokes bound F# callbacks when stepping through Ink 
   // 1. Initial waking text
   let initialEvents = runner.ContinueToNextEvent()
   Assert.NotEmpty initialEvents
-  Assert.Equal(4, runner.CurrentChoices.Length)
+  Assert.Equal(2, runner.CurrentChoices.Length)
 
-  // 2. Select choice 0: Draw two-handed greatsword (Berserker) -> leads to boy_encounter
+  // 2. Select choice 0: tempered arming sword (physical plane) -> leads to boy_encounter
   runner.ChooseChoice 0
   let boyEvents = runner.ContinueToNextEvent()
   Assert.NotEmpty boyEvents
 
   // Assert callbacks were invoked
-  Assert.Equal("Berserker", chosenClass)
+  Assert.Equal("fighter", chosenClass)
   Assert.Contains("prepared_mind", awardedMemories)
   Assert.Contains("rain_and_headlights", awardedMemories)
+
+[<Fact>]
+let ``StoryRunner mage branch chooses the mental plane via choose_class`` () =
+  let player = createTestPlayer ()
+  let inkJson = StoryRunner.LoadPrologueJson ()
+
+  let mutable chosenClass = ""
+  let runner =
+    StoryRunner(inkJson, player, onClassChosen = (fun cls -> chosenClass <- cls))
+
+  runner.ContinueToNextEvent() |> ignore
+  runner.ChooseChoice 1
+  let boyEvents = runner.ContinueToNextEvent()
+  Assert.NotEmpty boyEvents
+  Assert.Equal("mage", chosenClass)
 
 [<Fact>]
 let ``Memory tags awarded in story accurately reflect on the player's aggregate state``
@@ -60,7 +75,7 @@ let ``Memory tags awarded in story accurately reflect on the player's aggregate 
   let inkJson = StoryRunner.LoadPrologueJson ()
   let runner = StoryRunner(inkJson, player)
 
-  // Step waking -> choice 0 (greatsword -> prepared_mind awarded)
+  // Step waking -> choice 0 (arming sword -> prepared_mind awarded)
   runner.ContinueToNextEvent() |> ignore
   runner.ChooseChoice 0
   runner.ContinueToNextEvent() |> ignore
@@ -132,7 +147,7 @@ let ``Losing an encounter successfully reroutes the Ink story engine to the game
   Assert.Contains("oncoming truck", textJoined)
   Assert.Contains("phantom horn", textJoined)
   // Story has looped back to waking choices
-  Assert.Equal(4, runner.CurrentChoices.Length)
+  Assert.Equal(2, runner.CurrentChoices.Length)
 
 [<Fact>]
 let ``Winning combat encounter advances story to post_combat and awards shattered windshield``

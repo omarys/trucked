@@ -107,12 +107,6 @@ module StoryIntroCurve =
     [<Theory>]
     [<InlineData("fighter")>]
     [<InlineData("mage")>]
-    [<InlineData("berserker")>]
-    [<InlineData("duelist")>]
-    [<InlineData("warden")>]
-    [<InlineData("mesmer")>]
-    [<InlineData("abjurer")>]
-    [<InlineData("inquisitor")>]
     member _.``a prologue protagonist can walk the whole first story floor without resting``(className: string) =
       let player = Fornach.Domain.StoryBosses.createProloguePlayer className
       let mutable cleared = 0
