@@ -704,6 +704,23 @@ module Display =
     let plain = Text.RegularExpressions.Regex.Replace(title, @"\[[^\]]*\]", "").Trim()
     sprintf "%s (%s)" plain vector
 
+  /// The wind-up banner, shared by the lone-duel HUD and the pack HUD. A telegraphed heavy strike that
+  /// nobody prints reads as silence, and silence is the one thing an interrupt window cannot afford.
+  let writeTelegraphBanner (player: Combatant) (enemy: Combatant) (intent: ActionIntent) =
+    let title, desc, tip, _ = formatTelegraphedIntentWithLadder player enemy intent
+    let telegraphGrid = Grid()
+    telegraphGrid.AddColumn(GridColumn()) |> ignore
+    telegraphGrid.AddRow(Markup(sprintf "  [bold %s]󰓥 Telegraphed Windup:[/] %s" Theme.Yellow title)) |> ignore
+    telegraphGrid.AddRow(Markup(sprintf "  [grey]%s[/]" desc)) |> ignore
+    telegraphGrid.AddRow(Markup(sprintf "  [italic %s]💡 Counterplay:[/] %s" Theme.Green tip)) |> ignore
+    AnsiConsole.Write(
+      Panel(telegraphGrid)
+        .Header(sprintf "[bold %s] ⚡ TELEGRAPHED INTENT (%s) ── READ THE WINDUP [/]" Theme.Yellow (Markup.Escape enemy.Name))
+        .Border(BoxBorder.Double)
+        .BorderColor(Theme.ColorYellow)
+        .Expand()
+    )
+
   let renderHUDWithTelegraph (player: Combatant) (enemy: Combatant) (roundNumber: int) (enemyIntentOpt: ActionIntent option) =
     let pnlPlayer = createCombatantPanel player Theme.ColorGreen Theme.Green None
     let pnlEnemy = createCombatantPanel enemy Theme.ColorPink Theme.Pink (Some player)
@@ -735,20 +752,7 @@ module Display =
     AnsiConsole.Write(grid)
 
     match enemyIntentOpt with
-    | Some intent ->
-      let title, desc, tip, _ = formatTelegraphedIntentWithLadder player enemy intent
-      let telegraphGrid = Grid()
-      telegraphGrid.AddColumn(GridColumn()) |> ignore
-      telegraphGrid.AddRow(Markup(sprintf "  [bold %s]󰓥 Telegraphed Windup:[/] %s" Theme.Yellow title)) |> ignore
-      telegraphGrid.AddRow(Markup(sprintf "  [grey]%s[/]" desc)) |> ignore
-      telegraphGrid.AddRow(Markup(sprintf "  [italic %s]💡 Counterplay:[/] %s" Theme.Green tip)) |> ignore
-      let banner =
-        Panel(telegraphGrid)
-          .Header(sprintf "[bold %s] ⚡ ENEMY TELEGRAPHED INTENT ── READ THE WINDUP [/]" Theme.Yellow)
-          .Border(BoxBorder.Double)
-          .BorderColor(Theme.ColorYellow)
-          .Expand()
-      AnsiConsole.Write(banner)
+    | Some intent -> writeTelegraphBanner player enemy intent
     | None -> ()
 
     AnsiConsole.WriteLine()

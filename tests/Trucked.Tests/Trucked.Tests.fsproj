@@ -28,6 +28,7 @@
     <Compile Include="FlankSessionTests.fs" />
     <Compile Include="DebugToolingTests.fs" />
     <Compile Include="CombatTacticsTests.fs" />
+    <Compile Include="WindupReadabilityTests.fs" />
   </ItemGroup>
 
   <ItemGroup>

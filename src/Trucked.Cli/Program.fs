@@ -194,6 +194,16 @@ module Program =
       | _ -> false
     | _ -> false
 
+  /// True when the player can actually read the wind-up. A heavy strike the scrutiny ladder has masked as
+  /// "Obscured" earns no interrupt in the menu: offering it would hand back exactly what the ladder just
+  /// took away, and the player would spend a turn bashing a windup they were never shown.
+  let isWindupReadable (player: Combatant) (enemy: Combatant) (enemyIntentOpt: ActionIntent option) : bool =
+    match enemyIntentOpt with
+    | Some intent when isInterruptibleWindup enemyIntentOpt ->
+      let _, _, _, vector = Display.formatTelegraphedIntentWithLadder player enemy intent
+      vector <> "Obscured"
+    | _ -> false
+
   let private formatPrepOption (slot: PreparationSlot) : string =
     let catTag =
       match slot.Type.Category with
@@ -361,7 +371,7 @@ module Program =
           sprintf "⚡ [bold %s]Finesse Cadence: Relentless Blitz[/] (Agility Stance Gambit: +25 Recklessness)%s" Theme.Green pressAdvTag
           if player.Flow >= 2 then
             sprintf "🎯 [bold %s]Finesse Cadence: Threaded Opening[/] (Agility Stance Gambit: Burn %d Flow to Thread a Vital Opening, 0 Recklessness)%s" Theme.Green player.Flow pressAdvTag
-          if isInterruptibleWindup enemyIntentOpt then
+          if isWindupReadable player enemy enemyIntentOpt then
             sprintf "🛡️  [bold %s]Shield Bash[/] (Interrupt the windup — Power: knockdown, Agility: parry + counter window)%s" Theme.Cyan shieldInterruptTag
         ]
 
@@ -1125,7 +1135,7 @@ module Program =
   /// Renders the multi-enemy engagement HUD: the full player panel on the left, a one-row-per-foe pack
   /// table on the right, and a combat-log pane spanning the bottom. The pack used to be one bordered
   /// panel per enemy, so a large pack pushed the player card off the top of the screen.
-  let private renderGroupHud (player: Combatant) (enemies: TowerEnemy list) (round: int) (logLines: string list) =
+  let private renderGroupHud (player: Combatant) (enemies: TowerEnemy list) (round: int) (logLines: string list) (intentFor: (Combatant * ActionIntent) option) =
     AnsiConsole.Clear()
     AnsiConsole.Write(
       Rule(sprintf "[bold %s]⚔ MULTI-ENEMY ENGAGEMENT — ROUND %d[/]" Theme.Yellow round)
@@ -1243,6 +1253,12 @@ module Program =
     |> ignore
     body.Expand <- true
     AnsiConsole.Write(body)
+
+    // A pack fight has no wind-up line of its own until the blow lands, so the pack HUD prints the same
+    // telegraph the lone-duel HUD does; otherwise a telegraphed heavy strike reads as an empty log.
+    match intentFor with
+    | Some (actor, intent) -> Display.writeTelegraphBanner player actor intent
+    | None -> ()
 
     let logGrid = Grid()
     logGrid.AddColumn(GridColumn()) |> ignore
@@ -1388,7 +1404,7 @@ module Program =
       // exhausted itself hands over the initiative instead of leaving the player in the Nach.
       currentPlayer <-
         ActionResolver.settleTempoVacuum currentPlayer (currentEnemies |> List.map (fun e -> e.Combatant))
-      renderGroupHud currentPlayer currentEnemies round (logLines ())
+      renderGroupHud currentPlayer currentEnemies round (logLines ()) None
       let livingNow = living ()
       RuntimeLog.write (sprintf "group combat round %d: %d foe(s) standing" round livingNow.Length)
 
@@ -1403,7 +1419,7 @@ module Program =
               (sprintf "[bold %s]Choose your target:[/]" Theme.Yellow)
               (indexed |> List.map fst)
               None
-              (fun () -> renderGroupHud currentPlayer currentEnemies round (logLines ()))
+              (fun () -> renderGroupHud currentPlayer currentEnemies round (logLines ()) None)
           indexed |> List.find (fun (label, _) -> label = pick) |> snd
 
       // 2. Action selection (with an optional disengage)
@@ -1418,7 +1434,7 @@ module Program =
           (sprintf "[bold %s]Round %d - Action against %s (Press '?' or F1 for Symbol Legend):[/]" Theme.Yellow round target.Name)
           actionChoices
           (Some 12)
-          (fun () -> renderGroupHud currentPlayer currentEnemies round (logLines ()))
+          (fun () -> renderGroupHud currentPlayer currentEnemies round (logLines ()) (Some (targetCombatant, targetIntent)))
 
       if choice.Contains("Disengage") then
         // Parting strikes from the frontline living enemies (at most 4).
