@@ -6,7 +6,7 @@
     place its version is written down is here.
   -->
   <PropertyGroup>
-    <FornachVersion>0.1.13</FornachVersion>
+    <FornachVersion>0.1.14</FornachVersion>
     <Version>0.1.0</Version>
     <Authors>Trucked</Authors>
     <Product>Trucked</Product>
