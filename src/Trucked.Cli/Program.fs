@@ -264,7 +264,9 @@ module Program =
           sprintf "🌫️  [bold %s]Env Gambit: Denial Phase Shift[/] (Mist Shroud: 1.25x Agility strike, +25 Confusion, -15 Frustration)" Theme.Green
         elif enemy.Name.Contains("Anger") || enemy.Name.Contains("Guilt") || player.Name.Contains("Anger") || (player.Plane = Physical && player.Momentum >= 3) then
           sprintf "🌋 [bold %s]Env Gambit: Basalt Eruption[/] (Quarry Slag Smash: 1.5x Power cleave, shred 25 Armor, +30 Frustration)" Theme.Red
-        elif enemy.Name.Contains("Bargaining") || player.Name.Contains("Bargaining") || (player.Plane = Physical && player.Flow >= 3) then
+        // AcumenGambit is a Social/Mental move (Actions.fs classifies it CombatMode.Social) — the engine offers it
+        // only as the Bargaining-stage story device, never as a generic Physical unlock (a Fighter cannot coerce).
+        elif enemy.Name.Contains("Bargaining") || player.Name.Contains("Bargaining") then
           sprintf "⚖️  [bold %s]Env Gambit: Coercive Bargain[/] (Predatory Leverage: Steal 35 Morale to restore +25 HP, +25 Provoke)" Theme.Purple
         elif enemy.Name.Contains("Depression") || player.Name.Contains("Depression") || (player.Plane = Mental && player.Momentum >= 3) then
           sprintf "⚓ [bold %s]Trauma: Apathy Doldrums[/] (Submerged Weight: Inflict +40 Cognitive Fatigue & +25 Exhaustion)" Theme.Comment
