@@ -549,7 +549,7 @@ module TowerDisplay =
     row (Display.renderBar "󰋑 Health" p.Health.Current p.Health.Maximum Theme.Red) |> ignore
     row (Display.renderBar "󰧑 Morale" p.Morale.Current p.Morale.Maximum Theme.Cyan) |> ignore
     let armorText =
-      if p.Armor.IsShredded then
+      if p.Armor.IsShredded && p.Armor.Boost <= 0 then
         sprintf "%-10s [bold blink %s]SHREDDED (0%% soak) ⚠[/]" " Armor" Theme.Red
       else
         sprintf "%-10s [%s]%4d[/][%s]/[/]%4d [%s](%d%% soak)[/]" " Armor" Theme.Comment p.Armor.Current Theme.Comment p.Armor.Max Theme.Yellow (int (p.Armor.AbsorptionRatio * 100.0))

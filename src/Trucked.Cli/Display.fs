@@ -243,7 +243,7 @@ module Display =
     // Armor durability & Soak
     let armorPct = int (c.Armor.AbsorptionRatio * 100.0)
     let armorText =
-      if c.Armor.IsShredded then
+      if c.Armor.IsShredded && c.Armor.Boost <= 0 then
         sprintf "[bold %s]SHREDDED (0%% soak)[/]" Theme.Red
       else
         sprintf "[%s]%d / %d[/] [%s](%d%% soak)[/]" Theme.Comment c.Armor.Current c.Armor.Max Theme.Yellow armorPct
@@ -357,7 +357,7 @@ module Display =
 
     let armorPct = int (c.Armor.AbsorptionRatio * 100.0)
     let armorText =
-      if c.Armor.IsShredded then
+      if c.Armor.IsShredded && c.Armor.Boost <= 0 then
         sprintf "[bold %s]SHREDDED (0%% soak)[/]" Theme.Red
       else
         sprintf "[%s]%d / %d[/] [%s](%d%% soak)[/]" Theme.Comment c.Armor.Current c.Armor.Max Theme.Yellow armorPct

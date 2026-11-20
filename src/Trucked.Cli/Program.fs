@@ -1191,7 +1191,10 @@ module Program =
       let c = e.Combatant
       let standing = isStanding e
       let armorText =
-        if c.Armor.IsShredded then sprintf "[%s]SHREDDED[/]" Theme.Red
+        // Shredded armor with a raised shield is still soaking (plating counts in AbsorptionRatio) -- show the
+        // live number, or the plating looks like it does nothing at 0 durability.
+        if c.Armor.IsShredded && c.Armor.Boost <= 0 then sprintf "[%s]SHREDDED[/]" Theme.Red
+        elif c.Armor.IsShredded then sprintf "[%s]0%% +%d%% 🛡[/]" Theme.Yellow (int (c.Armor.AbsorptionRatio * 100.0))
         else sprintf "[%s]%d%%[/]" Theme.Yellow (int (c.Armor.AbsorptionRatio * 100.0))
       let weaponTag =
         match c.WeaponCondition with
