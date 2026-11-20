@@ -373,7 +373,11 @@ module TowerDisplay =
             elif Set.contains pt state.CurrentFloor.Visible then
               match Map.tryFind pt state.CurrentFloor.Entities with
               | Some (EntityEnemy e) ->
-                if e.IsDefeated then "%"
+                if e.IsDefeated then
+                  // A corpse is scenery; the exit gate beneath it is still navigation.
+                  match Map.tryFind pt state.CurrentFloor.Tiles with
+                  | Some (StairwayPortal _) -> "▲"
+                  | _ -> "%"
                 elif e.IsBoss then "☠"
                 else "!"
               | Some (EntityNpc _) -> "?"
@@ -427,7 +431,10 @@ module TowerDisplay =
           match Map.tryFind pt state.CurrentFloor.Entities with
           | Some (EntityEnemy e) ->
             if e.IsDefeated then
-              sb.Append(sprintf "[%s]%%[/]" Theme.Comment) |> ignore
+              // A corpse is scenery; the exit gate beneath it is still navigation.
+              match Map.tryFind pt state.CurrentFloor.Tiles with
+              | Some (StairwayPortal _ as tile) -> sb.Append(formatTileVisible tile theme) |> ignore
+              | _ -> sb.Append(sprintf "[%s]%%[/]" Theme.Comment) |> ignore
             elif e.IsBoss then
               // Bosses read differently from mobs on the minimap: skull, magenta, always bold.
               sb.Append(sprintf "[bold %s]☠[/]" Theme.Purple) |> ignore
