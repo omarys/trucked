@@ -14,6 +14,25 @@ module TowerDisplay =
 
   /// Outcome of a multi-enemy (group) engagement
   [<RequireQualifiedAccess>]
+  /// The honest cause of a defeat for the rewind log: collapse first (a run can end with full
+  /// pools), then the pool that emptied. Round-by-round combat never reaches the message log,
+  /// so this line is the only record of how the run ended.
+  let private defeatCause (foe: string) (c: Combatant) =
+    match c.Collapse with
+    | CollapseState.Collapsed reason ->
+      let meter =
+        match reason with
+        | CollapseReason.RecklessExposure -> "recklessness"
+        | CollapseReason.SomaticAnoxia -> "exhaustion"
+        | CollapseReason.Exsanguination -> "frustration"
+        | CollapseReason.CatatonicStupor -> "cognitive fatigue"
+        | CollapseReason.ContradictionLock -> "confusion"
+        | CollapseReason.HystericalMeltdown -> "provoke"
+      sprintf "collapsed — %s hit 100%%" meter
+    | CollapseState.Stable when c.Health.IsDepleted -> sprintf "were cut down by %s" foe
+    | CollapseState.Stable when c.Morale.IsDepleted -> sprintf "were demoralized by %s" foe
+    | CollapseState.Stable -> sprintf "were overwhelmed by %s" foe
+
   type GroupDuelOutcome =
     | Victorious
     | Defeated
@@ -1207,7 +1226,10 @@ module TowerDisplay =
           state <- traumaReset state
           state <-
             { state with
-                MessageLog = "Truck-kun strikes! Rewound through the trauma loop. You awaken at the entrance. All souls, trophies, and gear preserved!" :: state.MessageLog }
+                MessageLog =
+                  sprintf "Truck-kun strikes! You %s. Rewound through the trauma loop. You awaken at the entrance. All souls, trophies, and gear preserved!"
+                    (defeatCause "the pack" result.Player)
+                  :: state.MessageLog }
           state <- TowerSession.updateFov state
           AnsiConsole.MarkupLine(sprintf "\n[bold red]Trauma loop reset! Rewound to entrance. Health restored, progression preserved. Grind and prepare![/]")
           Thread.Sleep(1200)
@@ -1673,7 +1695,10 @@ module TowerDisplay =
                   state <- traumaReset { state with Player = updatedPlayer }
                   state <-
                     { state with
-                        MessageLog = "Truck-kun strikes! Rewound through the trauma loop. You awaken at the entrance. All souls, trophies, and gear preserved!" :: state.MessageLog }
+                        MessageLog =
+                          sprintf "Truck-kun strikes! You %s. Rewound through the trauma loop. You awaken at the entrance. All souls, trophies, and gear preserved!"
+                            (defeatCause enemy.Name updatedPlayer)
+                          :: state.MessageLog }
                   state <- TowerSession.updateFov state
                   AnsiConsole.MarkupLine(sprintf "\n[bold red]Trauma loop reset! Rewound to entrance. Health restored, progression preserved. Grind and prepare![/]")
                   Thread.Sleep(1200)
