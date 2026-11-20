@@ -725,7 +725,7 @@ module TowerDisplay =
           MirrorClones = 0
           ComboTracker = ConsecutiveComboTracker.Zero
           Collapse = CollapseState.Stable }
-    let depthCap, bossOffset = TowerSession.floorScalingFor state.IsStoryMode state.CurrentFloor.FloorNumber
+    let depthCap, bossOffset, roamingPoolFactor = TowerSession.floorScalingFor state.IsStoryMode state.CurrentFloor.FloorNumber
 
     let floorPlayerLevel =
       if state.CurrentFloor.InitialPlayerLevel > 0 then state.CurrentFloor.InitialPlayerLevel
@@ -737,7 +737,7 @@ module TowerDisplay =
 
     let pristine =
       TowerGenerator.generateFloorForPlane state.Seed state.CurrentFloor.FloorNumber state.IsStoryMode state.Player.Plane
-      |> TowerSession.rescaleFloorEnemiesWith depthCap bossOffset initialPlayer
+      |> TowerSession.rescaleFloorEnemiesWith depthCap bossOffset roamingPoolFactor initialPlayer
     let pristineMobs =
       pristine.Entities
       |> Map.toList

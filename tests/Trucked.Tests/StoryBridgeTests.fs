@@ -187,8 +187,10 @@ let ``StoryBosses resolves all 6 Grief Aspects with correct stances and pools`` 
     [ ("guilt_aspect", "Aspect of Guilt", CombatStance.PowerStance, 6400)
       ("denial_aspect", "Aspect of Denial", CombatStance.AgilityStance, 6500)
       ("anger_aspect", "Aspect of Anger", CombatStance.PowerStance, 7600)
-      ("bargaining_aspect", "Aspect of Bargaining", CombatStance.DisciplineStance, 10200)
-      ("depression_aspect", "Aspect of Depression", CombatStance.DisciplineStance, 11000)
+      // Pools re-pinned by difficulty telemetry: Bargaining 3.0->2.5 and Depression 2.5->2.0
+      // pool factors after both outlasted full-pools protagonists in 8-9 of 10 fresh duels.
+      ("bargaining_aspect", "Aspect of Bargaining", CombatStance.DisciplineStance, 8500)
+      ("depression_aspect", "Aspect of Depression", CombatStance.DisciplineStance, 8800)
       ("acceptance_aspect", "Aspect of Acceptance", CombatStance.DisciplineStance, 7200) ]
 
   for (enemyId, expectedName, expectedStance, expectedHealth) in testCases do

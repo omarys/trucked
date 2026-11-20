@@ -172,7 +172,7 @@ module OptimalPlayer =
 
   // -- driving a floor -------------------------------------------------------------------------------
 
-  let private chambersOf (floor: TowerFloor) (packSize: int) =
+  let chambersOf (floor: TowerFloor) (packSize: int) =
     let spawn = floor.SpawnLocation
     let distance (pt: Point) = abs (pt.X - spawn.X) + abs (pt.Y - spawn.Y)
 
