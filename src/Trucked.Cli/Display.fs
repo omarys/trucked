@@ -721,7 +721,27 @@ module Display =
         .Expand()
     )
 
-  let renderHUDWithTelegraph (player: Combatant) (enemy: Combatant) (roundNumber: int) (enemyIntentOpt: ActionIntent option) =
+  /// The rolling combat log, newest entry first so the latest blow is always the top line. Solo boss
+  /// duels and pack fights both feed it; ten lines fit the HUD without scrolling the panels away.
+  let writeCombatLogPanel (logLines: string list) =
+    let logGrid = Grid()
+    logGrid.AddColumn(GridColumn()) |> ignore
+    let recent = logLines |> List.rev |> List.truncate 10
+    if recent.IsEmpty then
+      logGrid.AddRow(Markup(sprintf "[%s]Awaiting the first exchange...[/]" Theme.Comment)) |> ignore
+    else
+      for line in recent do
+        logGrid.AddRow(Markup(line)) |> ignore
+    logGrid.Expand <- true
+    AnsiConsole.Write(
+      Panel(logGrid)
+        .Header(sprintf "[bold %s] COMBAT LOG [/]" Theme.Cyan)
+        .Border(BoxBorder.Rounded)
+        .BorderColor(Theme.ColorCurrentLine)
+        .Expand()
+    )
+
+  let renderHUDWithTelegraph (player: Combatant) (enemy: Combatant) (roundNumber: int) (enemyIntentOpt: ActionIntent option) (logLines: string list option) =
     let pnlPlayer = createCombatantPanel player Theme.ColorGreen Theme.Green None
     let pnlEnemy = createCombatantPanel enemy Theme.ColorPink Theme.Pink (Some player)
     let grid = Grid()
@@ -755,10 +775,12 @@ module Display =
     | Some intent -> writeTelegraphBanner player enemy intent
     | None -> ()
 
+    logLines |> Option.iter writeCombatLogPanel
+
     AnsiConsole.WriteLine()
 
   let renderHUD (player: Combatant) (enemy: Combatant) (roundNumber: int) =
-    renderHUDWithTelegraph player enemy roundNumber None
+    renderHUDWithTelegraph player enemy roundNumber None None
 
   let renderRollBreakdown (actionName: string) (actorName: string) (contestOpt: ContestResult option) =
     match contestOpt with

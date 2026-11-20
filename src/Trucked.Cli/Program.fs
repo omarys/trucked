@@ -515,7 +515,7 @@ module Program =
         && float player.Health.Current / float player.Health.Maximum > 0.70
 
       if isLoneBeastFleeEligible then
-        Display.renderHUDWithTelegraph player enemy round (Some enemyIntent)
+        Display.renderHUDWithTelegraph player enemy round (Some enemyIntent) None
         let fleePromptTitle =
           sprintf "[bold %s]🐾 The critically wounded %s is whimpering, limping away into the shadows![/]" Theme.Yellow enemy.Name
         let fleeChoices =
@@ -526,7 +526,7 @@ module Program =
             fleePromptTitle
             fleeChoices
             (Some 2)
-            (fun () -> Display.renderHUDWithTelegraph player enemy round (Some enemyIntent))
+            (fun () -> Display.renderHUDWithTelegraph player enemy round (Some enemyIntent) None)
 
         if fleeChoice.Contains("Spare") then
           player <-
@@ -550,7 +550,7 @@ module Program =
           AnsiConsole.MarkupLine(sprintf "\n[bold %s]☠️ You struck down the fleeing %s without hesitation (+15 Recklessness, Bestiary Prowess gained).[/]" Theme.Red enemy.Name)
 
       if not combatOver then
-        Display.renderHUDWithTelegraph player enemy round (Some enemyIntent)
+        Display.renderHUDWithTelegraph player enemy round (Some enemyIntent) None
 
         let choices = buildActionChoicesWithTelegraph player enemy (Some enemyIntent) true
         let choice =
@@ -558,7 +558,7 @@ module Program =
             (sprintf "[bold %s]Round %d - Select Tactical Action for %s (Press '?' or F1 for Symbol Legend):[/]" Theme.Yellow round player.Name)
             choices
             (Some 12)
-            (fun () -> Display.renderHUDWithTelegraph player enemy round (Some enemyIntent))
+            (fun () -> Display.renderHUDWithTelegraph player enemy round (Some enemyIntent) None)
 
         let playerIntent = parseActionChoice choice
         let playerActiveDefenseOpt =
@@ -878,6 +878,17 @@ module Program =
 
     mode, debugOptions
 
+  /// Appends one turn's header plus per-event lines to a rolling combat log. Damage events get the
+  /// numeric line (amount, plane, crit markers); everything else falls to the logger's generic text.
+  let appendTurnTo (log: System.Collections.Generic.List<string>) (nameOf: CombatantId -> string) (playerId: CombatantId) (header: string) (events: CombatEvent list) =
+    log.Add(sprintf "[bold %s]%s[/]" Theme.Yellow (Markup.Escape header))
+    for evt in events do
+      match evt with
+      | CombatEvent.DamageApplied d ->
+        log.Add(Display.formatDamageLogLine nameOf (d.TargetId = playerId) d)
+      | other ->
+        log.Add(sprintf "  [grey]• %s[/]" (Markup.Escape (CombatLogger.formatCombatEvent other)))
+
   let private runStoryDuel
     (floorNumber: int)
     (player: Combatant)
@@ -909,6 +920,11 @@ module Program =
 
     RuntimeLog.write (sprintf "combat start: %s vs %s (round 1)" currentCombatant.Name currentBoss.Name)
 
+    let combatLog = System.Collections.Generic.List<string>()
+    let nameOf (id: CombatantId) =
+      if id = currentCombatant.Id then currentCombatant.Name else currentBoss.Name
+    let logLines () = combatLog |> List.ofSeq
+
     while not combatOver do
       currentCombatant <- ActionResolver.settleTempoVacuum currentCombatant [ currentBoss ]
       let playerHasVor = currentCombatant.IsInVor || not currentBoss.IsInVor
@@ -920,7 +936,7 @@ module Program =
         && float currentCombatant.Health.Current / float currentCombatant.Health.Maximum > 0.70
 
       if isLoneBeastFleeEligible then
-        Display.renderHUDWithTelegraph currentCombatant currentBoss round (Some enemyIntent)
+        Display.renderHUDWithTelegraph currentCombatant currentBoss round (Some enemyIntent) (Some (logLines ()))
         let fleePromptTitle =
           sprintf "[bold %s]🐾 The critically wounded %s is whimpering, limping away into the shadows![/]" Theme.Yellow currentBoss.Name
         let fleeChoices =
@@ -931,7 +947,7 @@ module Program =
             fleePromptTitle
             fleeChoices
             (Some 2)
-            (fun () -> Display.renderHUDWithTelegraph currentCombatant currentBoss round (Some enemyIntent))
+            (fun () -> Display.renderHUDWithTelegraph currentCombatant currentBoss round (Some enemyIntent) (Some (logLines ())))
 
         if fleeChoice.Contains("Spare") then
           currentCombatant <-
@@ -957,7 +973,7 @@ module Program =
           AnsiConsole.MarkupLine(sprintf "\n[bold %s]☠️ You struck down the fleeing %s without hesitation (+15 Recklessness, Bestiary Prowess gained).[/]" Theme.Red currentBoss.Name)
 
       if not combatOver then
-        Display.renderHUDWithTelegraph currentCombatant currentBoss round (Some enemyIntent)
+        Display.renderHUDWithTelegraph currentCombatant currentBoss round (Some enemyIntent) (Some (logLines ()))
 
         let choices = buildActionChoicesWithTelegraph currentCombatant currentBoss (Some enemyIntent) true
         let choice =
@@ -965,7 +981,7 @@ module Program =
             (sprintf "[bold %s]Round %d - Tactical Action against %s (Press '?' or F1 for Symbol Legend):[/]" Theme.Yellow round currentBoss.Name)
             choices
             (Some 12)
-            (fun () -> Display.renderHUDWithTelegraph currentCombatant currentBoss round (Some enemyIntent))
+            (fun () -> Display.renderHUDWithTelegraph currentCombatant currentBoss round (Some enemyIntent) (Some (logLines ())))
 
         let playerIntent = parseActionChoice choice
         let playerActiveDefenseOpt =
@@ -1003,6 +1019,10 @@ module Program =
           CombatLogger.recordTurn session round turnNumber choice playerBefore bossBefore playerResult
           RuntimeLog.write (
             sprintf "combat round %d player turn: %s (%d events)" round choice playerResult.Events.Length)
+
+          appendTurnTo combatLog nameOf currentCombatant.Id
+            (sprintf "Round %d — %s executes %s" round currentCombatant.Name (Display.intentLogLabel playerIntent currentCombatant))
+            playerResult.Events
 
           Display.renderRollBreakdown choice currentCombatant.Name playerResult.Contest
           Display.logDamageSummary playerResult.Events bossBefore currentBoss
@@ -1076,6 +1096,10 @@ module Program =
           CombatLogger.recordTurn session round turnNumber intentDesc bossBeforeTurn playerBeforeTurn enemyResult
           RuntimeLog.write (
             sprintf "combat round %d enemy turn: %s (%d events)" round intentDesc enemyResult.Events.Length)
+
+          appendTurnTo combatLog nameOf currentCombatant.Id
+            (sprintf "Round %d — %s executes %s" round currentBoss.Name intentDesc)
+            enemyResult.Events
 
           Display.renderRollBreakdown intentDesc currentBoss.Name enemyResult.Contest
           Display.logDamageSummary enemyResult.Events playerBeforeTurn currentCombatant
@@ -1265,22 +1289,7 @@ module Program =
     | Some (actor, intent) -> Display.writeTelegraphBanner player actor intent
     | None -> ()
 
-    let logGrid = Grid()
-    logGrid.AddColumn(GridColumn()) |> ignore
-    let recent = logLines |> List.rev |> List.truncate 10 |> List.rev
-    if recent.IsEmpty then
-      logGrid.AddRow(Markup(sprintf "[%s]Awaiting the first exchange...[/]" Theme.Comment)) |> ignore
-    else
-      for line in recent do
-        logGrid.AddRow(Markup(line)) |> ignore
-    logGrid.Expand <- true
-    AnsiConsole.Write(
-      Panel(logGrid)
-        .Header(sprintf "[bold %s] COMBAT LOG [/]" Theme.Cyan)
-        .Border(BoxBorder.Rounded)
-        .BorderColor(Theme.ColorCurrentLine)
-        .Expand()
-    )
+    Display.writeCombatLogPanel logLines
     AnsiConsole.WriteLine()
 
   /// Interactive duel against a pack of enemies, modelled on runStoryDuel. The lone player resolves
@@ -1317,12 +1326,7 @@ module Program =
         |> Option.defaultValue "Unknown"
 
     let appendTurn (header: string) (events: CombatEvent list) =
-      combatLog.Add(sprintf "[bold %s]%s[/]" Theme.Yellow (Markup.Escape header))
-      for evt in events do
-        match evt with
-        | CombatEvent.DamageApplied d ->
-          combatLog.Add(Display.formatDamageLogLine nameOf (d.TargetId = currentPlayer.Id) d)
-        | other -> combatLog.Add(sprintf "  [grey]• %s[/]" (Markup.Escape (CombatLogger.formatCombatEvent other)))
+      appendTurnTo combatLog nameOf currentPlayer.Id header events
 
     let logLines () = combatLog |> List.ofSeq
 
