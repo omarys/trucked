@@ -214,7 +214,7 @@ let ``Anger Aspect initializes with high initial recklessness and overpowering k
   Assert.Equal(45, anger.Meters.Recklessness.Value)
   Assert.Equal(40, anger.Meters.Frustration.Value)
   Assert.True(anger.Stats.Get StatId.Force >= 140)
-  Assert.Equal(1, anger.Stats.Get StatId.Composure) // Clamped to domain minimum 1 (zero composure)
+  Assert.Equal(1, anger.Stats.Get StatId.Poise) // Clamped to domain minimum 1 (zero composure)
 
 [<Fact>]
 let ``Depression Aspect initializes with cognitive fatigue and impenetrable fortitude`` () =
@@ -547,15 +547,16 @@ let ``every Grief Aspect names a policy the story table resolves`` () =
 let ``the engine fights a Grief Aspect generically when no policy table is supplied`` () =
   // This is the point of the seam: `AI` holds no branch that knows what an Aspect is. Handed no table it
   // fights one as the GriefManifestation species it is -- Denial argues on the mental plane, so the
-  // species profile hands it an acumen interrogation and never phases out of the world. The signature
-  // press appears only once the story hands its own table over.
+  // species profile hands it a Power-vector blast and never phases out of the world. (It used to hand it an
+  // acumen interrogation; a grief manifestation has no Prowess, so that press could not land.) The
+  // signature press appears only once the story hands its own table over.
   let denial =
     { (StoryBosses.createEnemy "denial_aspect") with
         MirrorClones = 0
         Meters = { StatusMeters.Zero with Recklessness = Meter.Create 10 } }
 
   let target = createTestPlayer ()
-  Assert.Equal(StandardAttack (AcumenInterrogation true), AI.chooseIntent denial target)
+  Assert.Equal(StandardAttack (ArcaneCataclysm true), AI.chooseIntent denial target)
   Assert.Equal(StandardAttack (TraumaAttack FinesseGambit), AI.chooseIntentUsing Policies.all denial target)
 
 [<Fact>]
@@ -578,9 +579,9 @@ let ``every trauma gambit is named for its stat in the engine and for its Aspect
   let gambits =
     [ FinesseGambit, "Finesse", "Denial Phase Shift"
       ForceGambit, "Force", "Basalt Eruption"
-      AcumenGambit, "Acumen", "Coercive Bargain"
+      AcumenGambit, "Prowess", "Coercive Bargain"
       FortitudeGambit, "Fortitude", "Apathy Doldrums"
-      ComposureGambit, "Composure", "Serene Resolution" ]
+      ComposureGambit, "Poise", "Serene Resolution" ]
   for gambit, stat, storyName in gambits do
     Assert.Equal(stat, gambit.Name)
     Assert.Equal(sprintf "Trauma Gambit: %s" stat, gambit.Label)

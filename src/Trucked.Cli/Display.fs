@@ -94,6 +94,22 @@ type VimConsole(inner: IAnsiConsole, enableHelpHotkey: bool, enableVimKeys: bool
 
 module Display =
 
+  /// One wear ladder, two vocabularies: a blade is honed and a mage's mana is re-centred, so the
+  /// readout says "Weapon Integrity" on the physical plane and "Mana Integrity" on the mental one.
+  /// Returns the row label, the colour and the description.
+  let integrityReadout (c: Combatant) : string * string * string =
+    let name = WeaponCondition.displayNameFor c.Plane c.WeaponCondition
+
+    let colour, text =
+      match c.WeaponCondition with
+      | WeaponCondition.Pristine -> Theme.Green, sprintf "%s (100%% eff)" name
+      | WeaponCondition.Notched -> Theme.Yellow, sprintf "%s (-10%% eff)" name
+      | WeaponCondition.Damaged -> Theme.Orange, sprintf "%s (-25%% eff)" name
+      | WeaponCondition.Broken -> Theme.Red, sprintf "%s (-50%% eff)" name
+
+    let label = if c.Plane = Mental then "󰚌 Mana Integrity" else "󰚌 Weapon Integrity"
+    label, colour, text
+
   /// Strips supplementary-plane glyphs (nerd-font icons such as the tree and reticle marks) from
   /// text destined for a panel header. Spectre measures such a glyph as one cell while it occupies
   /// two UTF-16 units, so it pads the header line one cell too wide per glyph and the top border
@@ -228,13 +244,8 @@ module Display =
         | CombatStance.DisciplineStance -> "Discipline Stance (Prowess)"
       grid.AddRow(Markup(sprintf "%-22s [bold %s]%s[/]" "󰓥 Active Stance" stanceColor stanceName)) |> ignore
 
-    let weaponCondColor, weaponCondDesc =
-      match c.WeaponCondition with
-      | WeaponCondition.Pristine -> Theme.Green, "Pristine (100% eff)"
-      | WeaponCondition.Notched -> Theme.Yellow, "Notched (-10% dmg)"
-      | WeaponCondition.Damaged -> Theme.Orange, "Damaged (-25% dmg)"
-      | WeaponCondition.Broken -> Theme.Red, "Broken (-50% dmg)"
-    grid.AddRow(Markup(sprintf "%-22s [bold %s]%s[/]" "󰚌 Weapon Integrity" weaponCondColor weaponCondDesc)) |> ignore
+    let integrityLabel, weaponCondColor, weaponCondDesc = integrityReadout c
+    grid.AddRow(Markup(sprintf "%-22s [bold %s]%s[/]" integrityLabel weaponCondColor weaponCondDesc)) |> ignore
 
     // Health & Morale pools
     grid.AddRow(Markup(renderBar "󰋑 HP (Physical)" c.Health.Current c.Health.Maximum Theme.Red)) |> ignore
@@ -265,7 +276,7 @@ module Display =
       let cloneText = if c.MirrorClones > 0 then sprintf "[bold %s]🪞 %d Clones[/] " Theme.Purple c.MirrorClones else ""
       grid.AddRow(Markup(sprintf "%-22s %s%s%s%s%s" "󱁕 Special State" staggerText wardText cloneText bleedText limbText)) |> ignore
 
-    // Tactical Assessment (Acumen vs Composure)
+    // Tactical Assessment (Prowess vs Poise)
     match observerOpt with
     | Some obs ->
       let assess = TacticalAssessment.assess obs c
@@ -288,7 +299,7 @@ module Display =
         grid.AddRow(Markup(sprintf "%-22s %s" "🎯 Defensive Opening" (Markup.Escape vuln))) |> ignore
       | None -> ()
       grid.AddRow(Markup(sprintf "%-22s [italic %s]%s[/]" "💡 Tactical Advice" Theme.Yellow (Markup.Escape assess.StrategicAdvice))) |> ignore
-      grid.AddRow(Markup(sprintf "%-22s [grey]%s[/]" "󰄬 Scrutiny vs Tell" (sprintf "Effective Acumen %d vs Composure %d (Ratio: %.2fx)" assess.EffectiveAcumen assess.TargetComposure assess.Ratio))) |> ignore
+      grid.AddRow(Markup(sprintf "%-22s [grey]%s[/]" "󰄬 Scrutiny vs Tell" (sprintf "Effective Prowess %d vs Poise %d (Ratio: %.2fx)" assess.EffectiveAcumen assess.TargetComposure assess.Ratio))) |> ignore
     | None -> ()
 
     grid.AddRow(Rule().RuleStyle(Theme.StyleCurrentLine)) |> ignore
@@ -348,12 +359,7 @@ module Display =
   /// armor integrity, plus — when an observer is supplied — the observer's read of the target's
   /// primary stat and defensive opening. The combatant name is the panel header, so it is omitted.
   let compactCombatantLines (c: Combatant) (observerOpt: Combatant option) : string list =
-    let weaponCondColor, weaponCondDesc =
-      match c.WeaponCondition with
-      | WeaponCondition.Pristine -> Theme.Green, "Pristine (100% eff)"
-      | WeaponCondition.Notched -> Theme.Yellow, "Notched (-10% dmg)"
-      | WeaponCondition.Damaged -> Theme.Orange, "Damaged (-25% dmg)"
-      | WeaponCondition.Broken -> Theme.Red, "Broken (-50% dmg)"
+    let integrityLabel, weaponCondColor, weaponCondDesc = integrityReadout c
 
     let armorPct = int (c.Armor.AbsorptionRatio * 100.0)
     let armorText =
@@ -365,7 +371,7 @@ module Display =
     let coreLines =
       [ renderBar "󰋑 HP (Physical)" c.Health.Current c.Health.Maximum Theme.Red
         renderBar "󰧑 Morale (Mental)" c.Morale.Current c.Morale.Maximum Theme.Cyan
-        sprintf "%-22s [bold %s]%s[/]" "󰚌 Weapon Integrity" weaponCondColor weaponCondDesc
+        sprintf "%-22s [bold %s]%s[/]" integrityLabel weaponCondColor weaponCondDesc
         sprintf "%-22s %s" " Armor Integrity" armorText ]
 
     let assessmentLines =
@@ -500,7 +506,7 @@ module Display =
         "Rely on disciplined intuition.",
         "Agility"
       | AcumenInterrogation _ ->
-        sprintf "⚖️ [%s]Acumen Interrogation[/]" Theme.Purple,
+        sprintf "⚖️ [%s]Prowess Interrogation[/]" Theme.Purple,
         "Setting procedural traps to provoke frustration.",
         "Avoid reckless emotional outbursts.",
         "Discipline"
@@ -646,11 +652,11 @@ module Display =
     let enemyDC =
       if actor.IsBeast then actor.GetStat StatId.Finesse
       elif actor.Plane = Physical then actor.GetStat StatId.Poise
-      else actor.GetStat StatId.Composure
+      else actor.GetStat StatId.Poise
 
     let scrutiny =
       if actor.Plane = Physical then observer.GetStat StatId.Prowess
-      else observer.GetStat StatId.Acumen
+      else observer.GetStat StatId.Prowess
 
     let fullTitle, fullDesc, fullTip, vector = formatTelegraphedIntent intent actor
 
@@ -1021,9 +1027,6 @@ module Display =
     | CombatEvent.StrikeChained (_, _, step, dmg) ->
       AnsiConsole.MarkupLine(sprintf "  [bold %s]⚡ CHAIN FLOW #%d:[/] Disciplined cadence flowed into adjacent target for [bold %s]%d damage[/]! (0 Recklessness)" Theme.Purple step Theme.Red dmg)
 
-    | CombatEvent.ArcaneStrainIncurred (_, spellName, strain, profPct) ->
-      AnsiConsole.MarkupLine(sprintf "  [bold %s]⚡ ARCANE STRAIN:[/] Off-specialization cast of [bold underline %s]%s[/] (%d%% proficiency) caused [bold %s]+%d Cognitive Fatigue[/]!" Theme.Purple Theme.Cyan (gambitDisplayName spellName) profPct Theme.Purple strain)
-
     | CombatEvent.MirrorClonesConjured (_, count, total) ->
       AnsiConsole.MarkupLine(sprintf "  [bold %s]🪞 MIRROR ILLUSION:[/] Conjured [bold %s]+%d phantasmal mirror decoys[/] (Total Active: [bold %s]%d[/])." Theme.Purple Theme.Cyan count Theme.Purple total)
 
@@ -1144,7 +1147,7 @@ module Display =
       AnsiConsole.MarkupLine(sprintf "  [bold %s]🛡️ BASTION SHIELD:[/] Plating held up (+%d Armor Boost) and guard braced (+%d guard stacks)!" Theme.Green armor stacks)
 
     | CombatEvent.GuardSteeled (_, stacks) ->
-      AnsiConsole.MarkupLine(sprintf "  [bold %s]🛡️ GUARD STEELED:[/] Poise/Composure sharpened through the successful defence (+%d Guard Stack)!" Theme.Cyan stacks)
+      AnsiConsole.MarkupLine(sprintf "  [bold %s]🛡️ GUARD STEELED:[/] Poise/Poise sharpened through the successful defence (+%d Guard Stack)!" Theme.Cyan stacks)
 
     | CombatEvent.PainShockSuffered (_, dmg, pct, poise, resisted) ->
       if resisted then

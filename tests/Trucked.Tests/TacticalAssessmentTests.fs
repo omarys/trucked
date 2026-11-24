@@ -13,15 +13,16 @@ module TacticalAssessmentTests =
 
     let assess = TacticalAssessment.assess player gargoyle
 
-    // Stone Gargoyle stats: Reflex 240, Fortitude 220, Finesse 230, Poise 200, Force 180, Composure 150
+    // Stone Gargoyle stats: Reflex 240, Fortitude 220, Finesse 230, Poise 200, Force 180, Poise 150
     Assert.Equal(1, player.Level)
     Assert.Equal(StatId.Reflex, assess.PrimaryStat)
     Assert.Equal(240, assess.PrimaryStatValue)
     Assert.Equal("Agility Defense", assess.PrimaryStatRole)
-    // Level-1 Acumen 22 + Intuition 34/4 (8) = 30 vs Composure 150 -> Obscured
+    // Since the Prowess/Poise merge the read is a mental contest: Intellect 22 + Intuition 34/4 (8) = 30
+    // against the target's Resolve 160 -> Obscured.
     Assert.Equal(TacticalInsightLevel.Obscured, assess.InsightLevel)
     Assert.Equal(22 + 34 / 4, assess.EffectiveAcumen)
-    Assert.Equal(150, assess.TargetComposure)
+    Assert.Equal(160, assess.TargetComposure)
     Assert.True(assess.Ratio < 0.40)
     Assert.Equal((StatId.Fortitude, 220), assess.WeakestDefense)
     Assert.Equal("GUARDED POSTURE", assess.Headline)
@@ -29,16 +30,16 @@ module TacticalAssessmentTests =
 
   [<Fact>]
   let ``Prologue Mage scrutiny reads Stone Gargoyle as discerning at level 1`` () =
-    // The Mage kit: staff raises Acumen 45 -> 65 and robes raise Intuition 45 -> 60
+    // The Mage kit: staff raises Prowess 45 -> 65 and robes raise Intuition 45 -> 60
     let player = StoryBosses.createProloguePlayer "mage"
     let gargoyle = Bestiary.stoneGargoyle.ToCombatant (CombatantId.New())
 
     let assess = TacticalAssessment.assess player gargoyle
 
-    // Acumen 65 + Intuition 60/4 (15) = 80 vs Composure 150 (Ratio ~0.53)
+    // The staff sharpens Intellect to 70; 70 + Intuition 60/4 (15) = 85 vs Resolve 160 (Ratio ~0.53)
     Assert.Equal(TacticalInsightLevel.Discerning, assess.InsightLevel)
     Assert.Equal("DISCERNING READ", assess.Headline)
-    Assert.Equal(65 + 60 / 4, assess.EffectiveAcumen)
+    Assert.Equal(70 + 60 / 4, assess.EffectiveAcumen)
     Assert.True(assess.VulnerabilitySummary.IsSome)
     Assert.Equal(StatId.Reflex, assess.PrimaryStat)
     Assert.Equal(240, assess.PrimaryStatValue)
@@ -54,7 +55,7 @@ module TacticalAssessmentTests =
     Assert.Equal(StatId.Force, assess.PrimaryStat)
     Assert.Equal(105, assess.PrimaryStatValue)
     Assert.Equal((StatId.Reflex, 75), assess.WeakestDefense)
-    // Fighter Acumen 22 + Intuition 34/4 (8) = 30 vs Composure 50 -> Discerning (0.60)
+    // Fighter Prowess 22 + Intuition 34/4 (8) = 30 vs Poise 50 -> Discerning (0.60)
     Assert.Equal(TacticalInsightLevel.Discerning, assess.InsightLevel)
     Assert.Equal("DISCERNING READ", assess.Headline)
     Assert.True(assess.StrategicAdvice.Contains("immense kinetic striking power"))
@@ -66,7 +67,7 @@ module TacticalAssessmentTests =
 
     let assess = TacticalAssessment.assess player guilt
 
-    // Aspect of Guilt: Force 210, Fortitude 195, Poise 185, Reflex 95, Composure 150
+    // Aspect of Guilt: Force 210, Fortitude 195, Poise 185, Reflex 95, Poise 150
     Assert.Equal(StatId.Force, assess.PrimaryStat)
     Assert.Equal(210, assess.PrimaryStatValue)
     Assert.Equal((StatId.Reflex, 95), assess.WeakestDefense)
@@ -76,34 +77,38 @@ module TacticalAssessmentTests =
 
   [<Fact>]
   let ``Momentum stacks sharpen tactical insight from Obscured to Discerning`` () =
-    let player = StoryBosses.createProloguePlayer "fighter" // Acumen 22 + Intuition 34/4 (8) = 30
+    let player = StoryBosses.createProloguePlayer "fighter" // Intellect 22 + Intuition 34/4 (8) = 30
     let gargoyle = Bestiary.stoneGargoyle.ToCombatant (CombatantId.New())
 
     let initialAssess = TacticalAssessment.assess player gargoyle
     Assert.Equal(TacticalInsightLevel.Obscured, initialAssess.InsightLevel)
 
-    // Add 3 Momentum stacks (+45 effective Acumen: 30 + 45 = 75 / 150 = 0.50 -> Discerning)
-    let studiedPlayer = { player with Stats = player.Stats.ApplyModifiers [ StatId.Acumen, 45 ] }
-    let studiedAssess = TacticalAssessment.assess studiedPlayer gargoyle
+    // Three Momentum stacks are the real mechanic, not a stat edit: +15 scrutiny each, so
+    // 30 + 45 = 75 against Resolve 160 -> Discerning.
+    let studiedAssess = TacticalAssessment.assess { player with Momentum = 3 } gargoyle
 
     Assert.Equal(TacticalInsightLevel.Discerning, studiedAssess.InsightLevel)
     Assert.Equal(75, studiedAssess.EffectiveAcumen)
     Assert.Equal("DISCERNING READ", studiedAssess.Headline)
 
   [<Fact>]
-  let ``Zero composure target like Anger Aspect does not divide by zero and yields Penetrating insight`` () =
+  let ``a target with no guard does not divide by zero`` () =
     let player = StoryBosses.createProloguePlayer "fighter"
-    let anger = StoryBosses.createAngerAspect ()
 
-    // Anger Aspect has Composure = 0
-    let assess = TacticalAssessment.assess player anger
+    // Poise and Resolve are the merged guard pair; a floor of 1 keeps the ratio finite however bare the
+    // target's sheet is, so the insight ladder can never be computed from a division by zero.
+    let bare = Combatant.create (CombatantId.New()) "Bare" 100 100 (StatBlock.Create [])
+
+    // StatBlock floors a missing stat at 10, and the guard clamps the same way: never zero.
+    Assert.Equal(10, TacticalAssessment.calculateEffectiveMasking bare)
+    let assess = TacticalAssessment.assess player bare
+    Assert.True(System.Double.IsFinite assess.Ratio)
     Assert.Equal(TacticalInsightLevel.Penetrating, assess.InsightLevel)
-    Assert.True(assess.Ratio > 10.0)
 
   [<Fact>]
   let ``High composure gap yields Obscured posture with advice to build Momentum`` () =
     let noviceWarrior = TierFactory.createClassLevel CharacterClass.Warrior 1
-    let overseer = Bestiary.quarryOverseer.ToCombatant (CombatantId.New()) // Composure 390
+    let overseer = Bestiary.quarryOverseer.ToCombatant (CombatantId.New()) // Poise 390
 
     let assess = TacticalAssessment.assess noviceWarrior overseer
     Assert.Equal(TacticalInsightLevel.Obscured, assess.InsightLevel)
@@ -116,17 +121,17 @@ module TacticalAssessmentTests =
     let mentalBoss = StoryBosses.createAcceptanceAspect ()
 
     let assess = TacticalAssessment.assess player mentalBoss
-    // Mental boss Plane = Mental; stats: Intellect, Resolve, Acuity, Intuition, Acumen, Composure
+    // Mental boss Plane = Mental; stats: Intellect, Resolve, Acuity, Intuition, Prowess, Poise
     let desc = Attributes.descriptorOf assess.PrimaryStat
     Assert.Equal(Plane.Mental, desc.Plane)
 
   [<Fact>]
   let ``Tactical assessment threat warning surfaces correctly across insight levels`` () =
-    let observer = StoryBosses.createProloguePlayer "fighter" // Base Acumen 22 + Intuition 34/4 (8) = 30
-    let hound = Bestiary.slagHound.ToCombatant (CombatantId.New()) // Force 105, Composure 50
+    let observer = StoryBosses.createProloguePlayer "fighter" // Base Prowess 22 + Intuition 34/4 (8) = 30
+    let hound = Bestiary.slagHound.ToCombatant (CombatantId.New()) // Force 105, Poise 50
 
-    // 1. Obscured insight (high Composure target) -> ThreatWarning is None
-    let overseer = Bestiary.quarryOverseer.ToCombatant (CombatantId.New()) // Composure 390
+    // 1. Obscured insight (high Poise target) -> ThreatWarning is None
+    let overseer = Bestiary.quarryOverseer.ToCombatant (CombatantId.New()) // Poise 390
     let obscuredAssess = TacticalAssessment.assess observer overseer
     Assert.Equal(TacticalInsightLevel.Obscured, obscuredAssess.InsightLevel)
     Assert.True(obscuredAssess.ThreatWarning.IsNone, "Obscured insight should not reveal apex threat details")
@@ -139,9 +144,9 @@ module TacticalAssessmentTests =
     Assert.True(warnDiscerning.StartsWith("⚠ THREAT DETECTED"), sprintf "Expected threat detected prefix, got: %s" warnDiscerning)
     Assert.True(warnDiscerning.Contains("Force"), "Should detect Force as the threat stat")
 
-    // 3. Keen insight (elevated Acumen to reach ratio in [0.75, 1.15))
-    // Hound Composure 50 -> Need effective Acumen ~45 (ratio = 0.90 -> Keen)
-    let keenObserver = { observer with Stats = observer.Stats.ApplyModifiers [ StatId.Acumen, 15 ] } // 30 + 15 = 45 / 50 = 0.90 -> Keen
+    // 3. Keen insight (elevated scrutiny to reach ratio in [0.75, 1.15))
+    // The read is Intellect-based since the merge; the hound's Resolve is 60, so scrutiny ~55 gets Keen.
+    let keenObserver = { observer with Stats = observer.Stats.ApplyModifiers [ StatId.Intellect, 25 ] } // 30 + 25 = 55 / 60 = 0.92 -> Keen
     let keenAssess = TacticalAssessment.assess keenObserver hound
     Assert.Equal(TacticalInsightLevel.Keen, keenAssess.InsightLevel)
     Assert.True(keenAssess.ThreatWarning.IsSome)
@@ -149,8 +154,11 @@ module TacticalAssessmentTests =
     Assert.True(warnKeen.StartsWith("⚠ APEX THREAT:"), sprintf "Expected apex threat prefix, got: %s" warnKeen)
     Assert.True(warnKeen.Contains("Colossal Force (105)"), "Should specify exact apex Force value")
 
-    // 4. Penetrating insight (ratio >= 1.15, e.g. Anger Aspect with Composure 0)
+    // 4. Penetrating insight (ratio >= 1.15). Poise and Resolve are the merged guard pair now, so the
+    // Anger Aspect no longer has a zeroed mental guard to fall through: the observer is sharpened to
+    // reach the tier instead, which is what a Penetrating read costs.
     let anger = StoryBosses.createAngerAspect ()
+    let observer = { observer with Stats = observer.Stats.ApplyModifiers [ StatId.Intellect, 400 ] }
     let penAssess = TacticalAssessment.assess observer anger
     Assert.Equal(TacticalInsightLevel.Penetrating, penAssess.InsightLevel)
     Assert.True(penAssess.ThreatWarning.IsSome)

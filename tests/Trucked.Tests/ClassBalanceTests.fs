@@ -26,11 +26,11 @@ let ``Physical sub-classes follow exact 1.0 to 0.75 to 0.75 stat ratios`` () =
 let ``Mage mental stats grow at the full 1.0 ratio on all three mental axes`` () =
   let level = 200 // GrandMaster tier
 
-  // The Mage is the only arcane class left and normalizes Intellect, Acuity and Acumen at the primary 1.0 ratio
+  // The Mage is the only arcane class left and normalizes Intellect, Acuity and Prowess at the primary 1.0 ratio
   let mage = TierFactory.createClassLevel CharacterClass.Mage level
   Assert.Equal(841, mage.GetStat Intellect)
   Assert.Equal(841, mage.GetStat Acuity)
-  Assert.Equal(841, mage.GetStat Acumen)
+  Assert.Equal(841, mage.GetStat Prowess)
 
 [<Fact>]
 let ``Mage active Phantasmal Decoy Swap defuses incoming kinetic strike in the Nach`` () =
@@ -130,9 +130,11 @@ let ``Novice Mage facing Novice Warrior incurs disparity-scaled fatigue and exha
   let result = ActionResolver.resolve roller intent noviceWarrior noviceMage
 
   // Disparity is small (< 30), so every passive incurs its standard cost: ambient weave (+4), decoy swap
-  // (+5 fatigue, +3 exhaustion), composure ward reinforcement (+4) and psychic presence (+4)
-  Assert.Equal(17, result.Target.Meters.CognitiveFatigue.Value)
-  Assert.Equal(3, result.Target.Meters.Exhaustion.Value)
+  // (+5 fatigue, +3 exhaustion), composure ward reinforcement (+4) and psychic presence (+4). The mage's
+  // Poise then holds back its share of that pressure, so the totals are the tempered values.
+  let guard = ActionResolver.poiseGuardFraction noviceMage
+  Assert.Equal(int (Math.Round(17.0 * guard)), result.Target.Meters.CognitiveFatigue.Value)
+  Assert.Equal(int (Math.Round(3.0 * guard)), result.Target.Meters.Exhaustion.Value)
   Assert.Equal(noviceMage.Health.Current, result.Target.Health.Current)
 
 [<Fact>]
@@ -168,27 +170,31 @@ let ``Physical archetypes all carry real mental defence and keep only their offe
   let gmWarrior = TierFactory.createClassLevel CharacterClass.Warrior level
   let gmMage = TierFactory.createClassLevel CharacterClass.Mage level
 
-  // Mental defence is no longer a dump stat for physical archetypes: Resolve, Intuition and Composure
+  // Mental defence is no longer a dump stat for physical archetypes: Resolve, Intuition and Poise
   // all sit at the secondary tier (631 at GrandMaster) for both generic NPC classes. Only the off-plane
   // *offence* stays deliberately low, which is the trade-off that survived the class reduction.
   for fighter in [ gmRogue; gmWarrior ] do
     Assert.Equal(631, fighter.GetStat Resolve)
     Assert.Equal(631, fighter.GetStat Intuition)
-    Assert.Equal(631, fighter.GetStat Composure)
+    Assert.Equal(631, fighter.GetStat Poise)
     Assert.Equal(214, fighter.GetStat Intellect)
 
   // Agility archetype: Acuity is its off-plane offence (offOff = 317)
   Assert.Equal(317, gmRogue.GetStat Acuity)
 
-  // Power archetype: Acumen is its off-plane offence
-  Assert.Equal(317, gmWarrior.GetStat Acumen)
+  // Both archetypes keep Prowess with Poise at the secondary tier: the discipline pair is shared now,
+  // so it is no longer a class-flavoured off-plane offence.
+
+  // Power archetype: Prowess is the shared discipline pair now, so it sits with Poise at the
+  // secondary tier for every archetype rather than being a per-class off-plane offence.
+  Assert.Equal(631, gmWarrior.GetStat Prowess)
 
   // Magic user: the off-plane physical block grows a step behind the primary, so Force mirrors a Fighter's
-  // Intellect and Poise mirrors its Composure. The physical defences add the 80% spell-armour share (673)
+  // Intellect and Poise mirrors its Poise. The physical defences add the 80% spell-armour share (673)
   // on the `offDef` base but cap at the primary, so an equal-tier martial can still reach them; the guard
   // stat takes no share.
   Assert.Equal(420, gmMage.GetStat Force) // off-plane offence at half the primary
-  Assert.Equal(631, gmMage.GetStat Poise) // off-plane defence: the guard's martial half
+  Assert.Equal(841, gmMage.GetStat Poise) // the one shared guard: the caster's own discipline tier
   Assert.Equal(841, gmMage.GetStat Reflex) // 631 offDef + 80% share (673), capped at the primary
 
 [<Fact>]
@@ -516,7 +522,7 @@ let ``meter-gated gambit labels parse to their intended intents`` () =
 [<Fact>]
 let ``Mage and Fighter mirror each other to level 50, then the planes diverge`` () =
   let physical = [ Force; Fortitude; Finesse; Reflex; Prowess; Poise ]
-  let mental = [ Intellect; Resolve; Acuity; Intuition; Acumen; Composure ]
+  let mental = [ Intellect; Resolve; Acuity; Intuition; Prowess; Poise ]
 
   // One curve, mirrored: whatever a Fighter has in Force the Mage has in Intellect, and so on down the
   // block, so neither plane is a step behind before the split point.
@@ -538,13 +544,13 @@ let ``Mage and Fighter mirror each other to level 50, then the planes diverge`` 
     for defence, mirror in [ Fortitude, Resolve; Reflex, Intuition ] do
       Assert.Equal(fighter.GetStat mirror + share, mage.GetStat defence)
 
-    // Poise and Composure straddle the planes — Poise is the physical stat, Composure the mental one — so a
-    // Fighter's Poise is a Mage's Composure and vice versa. `GetGuard` is (Poise + Composure) / 2 and
+    // Poise and Poise straddle the planes — Poise is the physical stat, Poise the mental one — so a
+    // Fighter's Poise is a Mage's Poise and vice versa. `GetGuard` is (Poise + Poise) / 2 and
     // ignores the plane, so that straddle is what makes the guard plane-neutral: both classes read
     // (prim + offDef) / 2. Putting the pair on the own plane instead would raise every guard to a full
     // primary, which costs a discipline cash-out two thirds of its bite.
-    Assert.Equal(fighter.GetStat Poise, mage.GetStat Composure)
-    Assert.Equal(fighter.GetStat Composure, mage.GetStat Poise)
+    Assert.Equal(fighter.GetStat Poise, mage.GetStat Poise)
+    Assert.Equal(fighter.GetStat Poise, mage.GetStat Poise)
     Assert.Equal(fighter.GetGuard(Physical, false), mage.GetGuard(Mental, false))
 
   // Past 50 the split is deliberate: the Fighter's own plane outgrows its off-plane block, the Mage's

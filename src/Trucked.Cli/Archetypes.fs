@@ -143,7 +143,7 @@ module Archetypes =
     // ADR f1f14149: the class label is derived from the stat distribution, never chosen —
     // physical stats dominant means Fighter, mental stats dominant means Mage.
     let derivedClass =
-      if stat StatId.Force + stat StatId.Prowess >= stat StatId.Intellect + stat StatId.Acumen then
+      if stat StatId.Force + stat StatId.Prowess >= stat StatId.Intellect + stat StatId.Prowess then
         CharacterClass.Fighter
       else
         CharacterClass.Mage

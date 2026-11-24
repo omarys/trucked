@@ -9,10 +9,10 @@ open Trucked.Cli
 let ``statPair mirrors the stats ActionResolver contests against`` () =
   Assert.Equal((Force, [ Fortitude; Resolve ]), AttackEstimator.statPair (AttackClassification.ForceStrike false))
   Assert.Equal((Finesse, [ Reflex; Intuition ]), AttackEstimator.statPair (AttackClassification.FinesseCadence false))
-  Assert.Equal((Prowess, [ Poise; Composure ]), AttackEstimator.statPair (AttackClassification.MasterfulDisarm 3))
+  Assert.Equal((Prowess, [ Poise; Poise ]), AttackEstimator.statPair (AttackClassification.MasterfulDisarm 3))
   Assert.Equal((Intellect, [ Fortitude; Resolve ]), AttackEstimator.statPair (AttackClassification.ArcaneCataclysm false))
   Assert.Equal((Acuity, [ Reflex; Intuition ]), AttackEstimator.statPair (AttackClassification.SynapticGlamour false))
-  Assert.Equal((Acumen, [ Poise; Composure ]), AttackEstimator.statPair (AttackClassification.RunicWardTrap false))
+  Assert.Equal((Prowess, [ Poise; Poise ]), AttackEstimator.statPair (AttackClassification.RunicWardTrap false))
 
 [<Fact>]
 let ``a DisciplineStance defender is estimated against its real Poise guard`` () =

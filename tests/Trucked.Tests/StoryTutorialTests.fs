@@ -41,8 +41,8 @@ module StoryTutorialTests =
         StatId.Resolve
         StatId.Acuity
         StatId.Intuition
-        StatId.Acumen
-        StatId.Composure ]
+        StatId.Prowess
+        StatId.Poise ]
     for statId in allStats do
       Assert.Equal(expected.Stats.Get statId, player.Stats.Get statId)
 
@@ -156,17 +156,15 @@ module StoryTutorialTests =
     Assert.Contains("keystone_stage_1", cleared.CollectedKeys)
 
   [<Fact>]
-  let ``Each story stage gate levels the protagonist for the next biome's monsters`` () =
-    // Per-kill experience (~0.3 levels per floor after the tutorial) cannot keep pace with the story
-    // curve, so each stage's keystone guardian grants the level the next biome's monsters assume.
-    // The ramp lands on the Veteran threshold for the tower, whatever the stat curve puts that at.
+  let ``a stage gate pays a duel's XP and the ascent stays on the player's own curve`` () =
+    // A keystone guardian is worth several kills, not a scripted landing: the level the next biome sees is
+    // whatever the fighting earned, and the floors meet the player there because every enemy is re-levelled
+    // to them. Two consecutive stage bosses therefore buy levels, not a jump to a target tier.
     let player = StoryBosses.createProloguePlayer "fighter"
     let mutable state = TowerSession.initSessionWithMode player 4242 1 true
+    let mutable previousLevel = state.Player.Level
 
-    let gateLevels =
-      [ for floorNumber in 1..7 -> floorNumber, ProgressionScale.storyGuardianLevel floorNumber ]
-
-    for floorNumber, expectedLevel in gateLevels do
+    for floorNumber in 1..7 do
       Assert.Equal(floorNumber, state.CurrentFloor.FloorNumber)
 
       let guardian =
@@ -178,8 +176,15 @@ module StoryTutorialTests =
 
       Assert.True(guardian.IsSome, sprintf "floor %d must guard its keystone with an enemy" floorNumber)
       state <- TowerSession.resolveEnemyDefeat guardian.Value.Id state
-      Assert.Equal(expectedLevel, state.Player.Level)
+
+      // A guardian is worth several kills of XP, so it buys levels — never a scripted level value.
+      Assert.True(
+        state.Player.Level >= previousLevel,
+        sprintf "floor %d must not cost levels" floorNumber
+      )
+
       Assert.Contains(sprintf "keystone_stage_%d" floorNumber, state.CollectedKeys)
+      previousLevel <- state.Player.Level
 
       if floorNumber < 7 then
         state <- TowerSession.ascendFloor state

@@ -23,8 +23,8 @@ module CombatLoggerTests =
           StatId.Resolve, 80
           StatId.Acuity, 80
           StatId.Intuition, 80
-          StatId.Acumen, 80
-          StatId.Composure, 80 ]
+          StatId.Prowess, 80
+          StatId.Poise, 80 ]
     let baseC = Combatant.create (CombatantId.New()) name hp hp stats
     { baseC with Armor = ArmorIntegrity.Create armor }
 

@@ -113,8 +113,8 @@ module Simulation =
     configTable.AddRow("Armor Durability / Soak", sprintf "[%s]%d (%.0f%%)[/]" Theme.Yellow sampleA.Armor.Max (sampleA.Armor.AbsorptionRatio * 100.0), sprintf "[%s]%d (%.0f%%)[/]" Theme.Yellow sampleB.Armor.Max (sampleB.Armor.AbsorptionRatio * 100.0)) |> ignore
     let topPhysOff (c: Combatant) = [ c.GetStat Force; c.GetStat Finesse; c.GetStat Prowess ] |> List.max
     let topPhysDef (c: Combatant) = [ c.GetStat Fortitude; c.GetStat Reflex; c.GetStat Poise ] |> List.max
-    let topMentalOff (c: Combatant) = [ c.GetStat Intellect; c.GetStat Acuity; c.GetStat Acumen ] |> List.max
-    let topMentalDef (c: Combatant) = [ c.GetStat Resolve; c.GetStat Intuition; c.GetStat Composure ] |> List.max
+    let topMentalOff (c: Combatant) = [ c.GetStat Intellect; c.GetStat Acuity; c.GetStat Prowess ] |> List.max
+    let topMentalDef (c: Combatant) = [ c.GetStat Resolve; c.GetStat Intuition; c.GetStat Poise ] |> List.max
 
     configTable.AddRow("Top Phys Stat (Off / Def)", sprintf "%d / %d" (topPhysOff sampleA) (topPhysDef sampleA), sprintf "%d / %d" (topPhysOff sampleB) (topPhysDef sampleB)) |> ignore
     configTable.AddRow("Top Mental Stat (Off / Def)", sprintf "%d / %d" (topMentalOff sampleA) (topMentalDef sampleA), sprintf "%d / %d" (topMentalOff sampleB) (topMentalDef sampleB)) |> ignore

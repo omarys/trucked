@@ -99,9 +99,9 @@ module Program =
       StandardAttack (GuileDeception false)
     elif choice.Contains("Guile Deception: Confidence Trap") then
       StandardAttack (GuileDeception true)
-    elif choice.Contains("Acumen Interrogation: Procedural Pressure") then
+    elif choice.Contains("Prowess Interrogation: Procedural Pressure") then
       StandardAttack (AcumenInterrogation false)
-    elif choice.Contains("Acumen Interrogation: Socratic Checkmate") then
+    elif choice.Contains("Prowess Interrogation: Socratic Checkmate") then
       StandardAttack (AcumenInterrogation true)
     elif choice.Contains("Arcane Cataclysm: Elemental Blast") then
       StandardAttack (ArcaneCataclysm false)
@@ -398,27 +398,20 @@ module Program =
 
       else
         // Arcane Spellcraft (Mental Characters in Vor or Indes)
-        let powProf = int (Math.Round(player.GetArcaneProficiency Power * 100.0))
-        let agiProf = int (Math.Round(player.GetArcaneProficiency Agility * 100.0))
-
-        let strainTag (prof: int) =
-          if prof < 85 then sprintf " [%s](%d%% Prof - Off-School Strain)[/]" Theme.Comment prof
-          else sprintf " [bold %s](%d%% Prof - Specialization)[/]" Theme.Green prof
-
         let resolveSuffix = contestSuffix StatId.Intellect StatId.Resolve
         let intuitionSuffix = contestSuffix StatId.Acuity StatId.Intuition
 
         let powerSpells = [
-          sprintf "✨ [%s]Arcane Cataclysm: Elemental Blast[/] (Resonance Spike Form • Intellect vs. Resolve%s)%s%s" Theme.Pink resolveSuffix (strainTag powProf) powerCounterTag
+          sprintf "✨ [%s]Arcane Cataclysm: Elemental Blast[/] (Resonance Spike Form • Intellect vs. Resolve%s)%s" Theme.Pink resolveSuffix powerCounterTag
           if player.ComplexForm <> Some ComplexForm.AegisLattice then
-            sprintf "⚡ [bold %s]Arcane Cataclysm: Overchannel[/] (Resonance Spike Gambit: +35 Recklessness, Splash)%s%s" Theme.Pink (strainTag powProf) pressAdvTag
+            sprintf "⚡ [bold %s]Arcane Cataclysm: Overchannel[/] (Resonance Spike Gambit: +35 Recklessness, Splash)%s" Theme.Pink pressAdvTag
         ]
 
         let agilitySpells = [
-          sprintf "✨ [%s]Synaptic Glamour: Neural Static[/] (Phantasmal Diffusion Form • Acuity vs. Intuition%s)%s%s" Theme.Purple intuitionSuffix (strainTag agiProf) agilityCounterTag
-          sprintf "⚡ [bold %s]Synaptic Glamour: Mind Fracture[/] (Phantasmal Diffusion Gambit: +25 Recklessness)%s%s" Theme.Purple (strainTag agiProf) pressAdvTag
-          sprintf "🪞 [%s]Mirror Illusion: Phantasmal Decoys[/] (Phantasmal Diffusion Form • Weave Mirror Clones)%s" Theme.Purple (strainTag agiProf)
-          sprintf "⚡ [bold %s]Mirror Illusion: Decoy Swarm[/] (Phantasmal Diffusion Gambit: +25 Recklessness, Extra Clones)%s" Theme.Purple (strainTag agiProf)
+          sprintf "✨ [%s]Synaptic Glamour: Neural Static[/] (Phantasmal Diffusion Form • Acuity vs. Intuition%s)%s" Theme.Purple intuitionSuffix agilityCounterTag
+          sprintf "⚡ [bold %s]Synaptic Glamour: Mind Fracture[/] (Phantasmal Diffusion Gambit: +25 Recklessness)%s" Theme.Purple pressAdvTag
+          sprintf "🪞 [%s]Mirror Illusion: Phantasmal Decoys[/] (Phantasmal Diffusion Form • Weave Mirror Clones)" Theme.Purple
+          sprintf "⚡ [bold %s]Mirror Illusion: Decoy Swarm[/] (Phantasmal Diffusion Gambit: +25 Recklessness, Extra Clones)" Theme.Purple
         ]
 
         let spellGroups =
@@ -471,7 +464,7 @@ module Program =
         else
           match stanceVector with
           | Vector.Agility -> "Guile Deception: Rhetorical Misdirection"
-          | Vector.Discipline -> "Acumen Interrogation: Procedural Pressure"
+          | Vector.Discipline -> "Prowess Interrogation: Procedural Pressure"
           | _ -> "Authority Decree: Imperious Command"
 
       choices
@@ -731,7 +724,7 @@ module Program =
             (sample.GetStat Force) (sample.GetStat Fortitude) (sample.GetStat Prowess) (sample.GetStat Poise)
         | CombatMode.Social ->
           sprintf "Presence: %d, Will: %d, Leverage: %d"
-            (sample.GetStat Intellect) (sample.GetStat Resolve) (sample.GetStat Acumen)
+            (sample.GetStat Intellect) (sample.GetStat Resolve) (sample.GetStat Prowess)
         | CombatMode.Arcane ->
           sprintf "Intellect: %d, Acuity: %d, Resolve: %d"
             (sample.GetStat Intellect) (sample.GetStat Acuity) (sample.GetStat Resolve)
@@ -779,8 +772,8 @@ module Program =
     let resolve = Display.askInt(sprintf "  [%s]Resolve / Will (Mental Defense Power):[/] " Theme.Cyan, 60)
     let acuity = Display.askInt(sprintf "  [%s]Acuity / Guile (Mental Offense Agility):[/] " Theme.Pink, 60)
     let intuition = Display.askInt(sprintf "  [%s]Intuition / Insight (Mental Defense Agility):[/] " Theme.Pink, 60)
-    let acumen = Display.askInt(sprintf "  [%s]Acumen / Leverage (Mental Offense Discipline):[/] " Theme.Orange, 60)
-    let composure = Display.askInt(sprintf "  [%s]Composure (Mental Defense Discipline):[/] " Theme.Orange, 60)
+    let acumen = Display.askInt(sprintf "  [%s]Prowess / Leverage (Mental Offense Discipline):[/] " Theme.Orange, 60)
+    let composure = Display.askInt(sprintf "  [%s]Poise (Mental Defense Discipline):[/] " Theme.Orange, 60)
 
     let statsList = [
       Force, force; Fortitude, fort
@@ -788,7 +781,7 @@ module Program =
       Prowess, prowess; Poise, poise
       Intellect, intellect; Resolve, resolve
       Acuity, acuity; Intuition, intuition
-      Acumen, acumen; Composure, composure
+      Prowess, acumen; Poise, composure
     ]
 
     let customFactory () =
@@ -1223,9 +1216,15 @@ module Program =
       let weaponTag =
         match c.WeaponCondition with
         | WeaponCondition.Pristine -> ""
-        | WeaponCondition.Notched -> sprintf "[%s]WPN-NOTCHED[/]" Theme.Yellow
-        | WeaponCondition.Damaged -> sprintf "[%s]WPN-DAMAGED[/]" Theme.Orange
-        | WeaponCondition.Broken -> sprintf "[%s]WPN-BROKEN[/]" Theme.Red
+        | condition ->
+          let theme =
+            match condition with
+            | WeaponCondition.Notched -> Theme.Yellow
+            | WeaponCondition.Damaged -> Theme.Orange
+            | _ -> Theme.Red
+
+          let name = (WeaponCondition.displayNameFor c.Plane c.WeaponCondition).ToUpperInvariant()
+          sprintf "[%s]%s[/]" theme name
       let assessment = TacticalAssessment.assess player c
       let threat =
         match assessment.ThreatWarning, assessment.VulnerabilitySummary with

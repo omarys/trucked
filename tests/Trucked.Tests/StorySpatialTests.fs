@@ -23,8 +23,8 @@ module StorySpatialTests =
           StatId.Resolve, 60
           StatId.Acuity, 60
           StatId.Intuition, 60
-          StatId.Acumen, 60
-          StatId.Composure, 60 ]
+          StatId.Prowess, 60
+          StatId.Poise, 60 ]
     Combatant.create (CombatantId.New()) "PlayerCharacter" 250 250 stats
 
   [<Fact>]

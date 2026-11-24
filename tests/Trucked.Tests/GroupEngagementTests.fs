@@ -19,8 +19,8 @@ module GroupEngagementTests =
           StatId.Resolve, 80
           StatId.Acuity, 80
           StatId.Intuition, 100
-          StatId.Acumen, acumen
-          StatId.Composure, composure ]
+          StatId.Prowess, acumen
+          StatId.Poise, composure ]
     Combatant.create (CombatantId.New()) name hp hp stats
 
   [<Fact>]

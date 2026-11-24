@@ -607,13 +607,8 @@ module TowerDisplay =
         | CombatStance.DisciplineStance -> Theme.Purple
       row (sprintf "%-22s [bold %s]%A[/]" "󰓥 Combat Stance" stanceColor p.Stance) |> ignore
 
-      let weaponCondColor, weaponCondDesc =
-        match p.WeaponCondition with
-        | WeaponCondition.Pristine -> Theme.Green, "Pristine (100% dmg)"
-        | WeaponCondition.Notched -> Theme.Yellow, "Notched (-10% dmg)"
-        | WeaponCondition.Damaged -> Theme.Orange, "Damaged (-25% dmg) ⚠"
-        | WeaponCondition.Broken -> Theme.Red, "Broken (-50% dmg) ☠"
-      row (sprintf "%-22s [bold %s]%s[/]" "󰚌 Weapon Integrity" weaponCondColor weaponCondDesc) |> ignore
+      let integrityLabel, weaponCondColor, weaponCondDesc = Display.integrityReadout p
+      row (sprintf "%-22s [bold %s]%s[/]" integrityLabel weaponCondColor weaponCondDesc) |> ignore
 
     // Physical & Emotional Strain Meters
     row (Display.renderMeter "󰈸 Recklessness" p.Meters.Recklessness Theme.Orange) |> ignore
@@ -674,7 +669,7 @@ module TowerDisplay =
         |> List.map (fun (kind, cnt) ->
           let label =
             if state.UnidentifiedConsumables.Contains kind then "?"
-            else kind.Name
+            else kind.NameFor state.Player.Plane
           sprintf "[bold %s]%s (x%d)[/]" Theme.Green label cnt)
         |> String.concat ", "
     row (sprintf "󰆧 Consumables: %s" consumablesDisplay) |> ignore
@@ -1040,7 +1035,7 @@ module TowerDisplay =
     let interactive = not Console.IsInputRedirected
 
     while viewing do
-      let rows = Consumables.describe state.UnidentifiedConsumables byName state.Consumables
+      let rows = Consumables.describeFor state.Player.Plane state.UnidentifiedConsumables byName state.Consumables
 
       let body =
         if rows.IsEmpty then
@@ -1489,11 +1484,13 @@ module TowerDisplay =
       AnsiConsole.Write(grid)
       AnsiConsole.Write(bottomPanel)
       if inspectCursor.IsNone then
+        let restLabel = if state.Player.Plane = Mental then "Rest & Center" else "Rest & Hone"
+
         let hotkeys =
           sprintf
-            "[%s][[WASD/hjkl]][/] [%s]Move[/]  [%s][[Space/.]][/] [%s]Rest & Hone[/]  [%s][[x/;]][/] [%s]Inspect[/]  [%s][[i]][/] [%s]Items[/]  [%s][[c]][/] [%s]Sheet[/]  [%s][[v]][/] [%s]Log[/]  [%s][[?/F1]][/] [%s]Help[/]  [%s][[q]][/] [%s]Retreat[/]"
+            "[%s][[WASD/hjkl]][/] [%s]Move[/]  [%s][[Space/.]][/] [%s]%s[/]  [%s][[x/;]][/] [%s]Inspect[/]  [%s][[i]][/] [%s]Items[/]  [%s][[c]][/] [%s]Sheet[/]  [%s][[v]][/] [%s]Log[/]  [%s][[?/F1]][/] [%s]Help[/]  [%s][[q]][/] [%s]Retreat[/]"
             Theme.Yellow Theme.Comment
-            Theme.Green Theme.Comment
+            Theme.Green Theme.Comment restLabel
             Theme.Cyan Theme.Comment
             Theme.Pink Theme.Comment
             Theme.Purple Theme.Comment
@@ -2026,11 +2023,13 @@ module TowerDisplay =
             state <- TowerSession.honeOnSafeStep state
 
             if state.Player.WeaponCondition <> weaponBefore then
-              state <-
-                { state with
-                    MessageLog =
-                      sprintf "You hone your weapon as you advance (%s)." (WeaponCondition.displayName state.Player.WeaponCondition)
-                      :: state.MessageLog }
+              let wearMsg =
+                if state.Player.Plane = Mental then
+                  sprintf "You settle your mana as you advance (%s)." (WeaponCondition.displayNameFor Mental state.Player.WeaponCondition)
+                else
+                  sprintf "You hone your weapon as you advance (%s)." (WeaponCondition.displayNameFor Physical state.Player.WeaponCondition)
+
+              state <- { state with MessageLog = wearMsg :: state.MessageLog }
 
             if state.Player.BleedStacks > 0 then
               state <-
@@ -2061,9 +2060,11 @@ module TowerDisplay =
               { Combatant.clearStacks recovered with
                   WeaponCondition = honedWeapon }
             let weaponMsg =
-              if honedWeapon <> state.Player.WeaponCondition then
-                sprintf ", weapon honed to %A" honedWeapon
-              else ""
+              if honedWeapon = state.Player.WeaponCondition then ""
+              elif state.Player.Plane = Mental then
+                sprintf ", mana re-centred to %s" (WeaponCondition.displayNameFor Mental honedWeapon)
+              else
+                sprintf ", weapon honed to %s" (WeaponCondition.displayNameFor Physical honedWeapon)
             let logMsg =
               if not safe then
                 sprintf "You tend your gear, but cannot recover while enemies are near (armor repaired%s, strain vented)." weaponMsg
@@ -2118,7 +2119,7 @@ module TowerDisplay =
               match TowerSession.useConsumable kind state with
               | Ok updated ->
                 state <- updated
-                AnsiConsole.MarkupLine(sprintf "\n[bold %s]Used %s.[/]" Theme.Green kind.Name)
+                AnsiConsole.MarkupLine(sprintf "\n[bold %s]Used %s.[/]" Theme.Green (kind.NameFor state.Player.Plane))
               | Error msg -> AnsiConsole.MarkupLine(sprintf "\n[bold %s]%s[/]" Theme.Red msg)
 
               Thread.Sleep(700)

@@ -20,8 +20,8 @@ let private createTestPlayer () =
         StatId.Resolve, 50
         StatId.Acuity, 40
         StatId.Intuition, 40
-        StatId.Acumen, 40
-        StatId.Composure, 40 ]
+        StatId.Prowess, 40
+        StatId.Poise, 40 ]
 
   Combatant.create (CombatantId.New()) "Explorer" 200 200 stats
 
