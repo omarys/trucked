@@ -46,6 +46,7 @@ module Program =
       SelectionPrompt<ArchetypeInfo>()
         .Title(title)
         .PageSize(10)
+        .HighlightStyle(Theme.StylePromptHighlight)
         .UseConverter(fun a ->
           let tierColor =
             match a.Tier with
@@ -360,16 +361,22 @@ module Program =
         // In Vor or Indes (Attacker): Power and Agility vectors plus preparations and recoveries
         let fortSuffix = contestSuffix StatId.Force StatId.Fortitude
         let refSuffix = contestSuffix StatId.Finesse StatId.Reflex
+        let powerStanceTag =
+          if player.Stance = CombatStance.PowerStance then sprintf " [bold %s]✓ In Stance[/]" Theme.Green
+          else sprintf " [%s](shifts after swing)[/]" Theme.Comment
+        let agilityStanceTag =
+          if player.Stance = CombatStance.AgilityStance then sprintf " [bold %s]✓ In Stance[/]" Theme.Green
+          else sprintf " [%s](shifts after swing)[/]" Theme.Comment
 
         let powerStrikes = [
-          sprintf "⚔️  [%s]Force Strike: Standard Cleave[/] (Power Stance • Cleave vs. Fortitude%s)%s" Theme.Red fortSuffix powerCounterTag
+          sprintf "⚔️  [%s]Force Strike: Standard Cleave[/] (Power Stance • Cleave vs. Fortitude%s)%s%s" Theme.Red fortSuffix powerStanceTag powerCounterTag
           sprintf "⚡ [bold %s]Force Strike: Wild Blow[/] (Power Stance Gambit: +30 Recklessness, 1.5x Dmg)%s" Theme.Red pressAdvTag
           if player.Momentum >= 2 then
             sprintf "🎯 [bold %s]Force Strike: Insight Cleave[/] (Power Stance Gambit: Burn %d Momentum for a Read Opening, 0 Recklessness)%s" Theme.Red player.Momentum pressAdvTag
         ]
 
         let agilityStrikes = [
-          sprintf "⚔️  [%s]Finesse Cadence: Rapid Probing[/] (Agility Stance • Probing Cadence vs. Reflex%s)%s" Theme.Green refSuffix agilityCounterTag
+          sprintf "⚔️  [%s]Finesse Cadence: Rapid Probing[/] (Agility Stance • Probing Cadence vs. Reflex%s)%s%s" Theme.Green refSuffix agilityStanceTag agilityCounterTag
           sprintf "⚡ [bold %s]Finesse Cadence: Relentless Blitz[/] (Agility Stance Gambit: +25 Recklessness)%s" Theme.Green pressAdvTag
           if player.Flow >= 2 then
             sprintf "🎯 [bold %s]Finesse Cadence: Threaded Opening[/] (Agility Stance Gambit: Burn %d Flow to Thread a Vital Opening, 0 Recklessness)%s" Theme.Green player.Flow pressAdvTag
@@ -400,15 +407,21 @@ module Program =
         // Arcane Spellcraft (Mental Characters in Vor or Indes)
         let resolveSuffix = contestSuffix StatId.Intellect StatId.Resolve
         let intuitionSuffix = contestSuffix StatId.Acuity StatId.Intuition
+        let resonanceFormTag =
+          if player.ComplexForm = Some ComplexForm.ResonanceSpike then sprintf " [bold %s]✓ Threaded[/]" Theme.Green
+          else sprintf " [%s](threads after cast)[/]" Theme.Comment
+        let diffusionFormTag =
+          if player.ComplexForm = Some ComplexForm.PhantasmalDiffusion then sprintf " [bold %s]✓ Threaded[/]" Theme.Green
+          else sprintf " [%s](threads after cast)[/]" Theme.Comment
 
         let powerSpells = [
-          sprintf "✨ [%s]Arcane Cataclysm: Elemental Blast[/] (Resonance Spike Form • Intellect vs. Resolve%s)%s" Theme.Pink resolveSuffix powerCounterTag
+          sprintf "✨ [%s]Arcane Cataclysm: Elemental Blast[/] (Resonance Spike Form • Intellect vs. Resolve%s)%s%s" Theme.Pink resolveSuffix resonanceFormTag powerCounterTag
           if player.ComplexForm <> Some ComplexForm.AegisLattice then
             sprintf "⚡ [bold %s]Arcane Cataclysm: Overchannel[/] (Resonance Spike Gambit: +35 Recklessness, Splash)%s" Theme.Pink pressAdvTag
         ]
 
         let agilitySpells = [
-          sprintf "✨ [%s]Synaptic Glamour: Neural Static[/] (Phantasmal Diffusion Form • Acuity vs. Intuition%s)%s" Theme.Purple intuitionSuffix agilityCounterTag
+          sprintf "✨ [%s]Synaptic Glamour: Neural Static[/] (Phantasmal Diffusion Form • Acuity vs. Intuition%s)%s%s" Theme.Purple intuitionSuffix diffusionFormTag agilityCounterTag
           sprintf "⚡ [bold %s]Synaptic Glamour: Mind Fracture[/] (Phantasmal Diffusion Gambit: +25 Recklessness)%s" Theme.Purple pressAdvTag
           sprintf "🪞 [%s]Mirror Illusion: Phantasmal Decoys[/] (Phantasmal Diffusion Form • Weave Mirror Clones)" Theme.Purple
           sprintf "⚡ [bold %s]Mirror Illusion: Decoy Swarm[/] (Phantasmal Diffusion Gambit: +25 Recklessness, Extra Clones)" Theme.Purple
@@ -564,7 +577,8 @@ module Program =
           let playerBefore = player
           let enemyBefore = enemy
 
-          AnsiConsole.MarkupLine(sprintf "\n[bold %s]%s executes %s...[/]" Theme.Green player.Name choice)
+          let actionLabel = Display.intentLogLabel playerIntent player
+          AnsiConsole.MarkupLine(sprintf "\n[bold %s]%s executes %s...[/]" Theme.Green (Markup.Escape player.Name) (Markup.Escape actionLabel))
           let enemyDefOpt =
             if enemy.IsHumanoid && enemy.IsInNach && not enemy.IsStaggered then
               Some(Guard(AI.chooseActiveDefense enemy player))
@@ -579,7 +593,7 @@ module Program =
 
           CombatLogger.recordTurn session round turnNumber choice playerBefore enemyBefore playerResult
 
-          Display.renderRollBreakdown choice player.Name playerResult.Contest
+          Display.renderRollBreakdown (Markup.Escape actionLabel) player.Name playerResult.Contest
           Display.logDamageSummary playerResult.Events enemyBefore enemy
           playerResult.Events |> List.iter Display.logEvent
 
@@ -871,16 +885,12 @@ module Program =
 
     mode, debugOptions
 
-  /// Appends one turn's header plus per-event lines to a rolling combat log. Damage events get the
-  /// numeric line (amount, plane, crit markers); everything else falls to the logger's generic text.
+  /// Appends one turn's header plus per-event lines to a rolling combat log, using semantic
+  /// color-coding and guaranteed Spectre markup escaping.
   let appendTurnTo (log: System.Collections.Generic.List<string>) (nameOf: CombatantId -> string) (playerId: CombatantId) (header: string) (events: CombatEvent list) =
     log.Add(sprintf "[bold %s]%s[/]" Theme.Yellow (Markup.Escape header))
     for evt in events do
-      match evt with
-      | CombatEvent.DamageApplied d ->
-        log.Add(Display.formatDamageLogLine nameOf (d.TargetId = playerId) d)
-      | other ->
-        log.Add(sprintf "  [grey]• %s[/]" (Markup.Escape (CombatLogger.formatCombatEvent other)))
+      log.Add(Display.formatCombatLogEvent nameOf playerId evt)
 
   let private runStoryDuel
     (floorNumber: int)
@@ -987,7 +997,8 @@ module Program =
           let playerBefore = currentCombatant
           let bossBefore = currentBoss
 
-          AnsiConsole.MarkupLine(sprintf "\n[bold %s]%s executes %s...[/]" Theme.Green currentCombatant.Name choice)
+          let actionLabel = Display.intentLogLabel playerIntent currentCombatant
+          AnsiConsole.MarkupLine(sprintf "\n[bold %s]%s executes %s...[/]" Theme.Green (Markup.Escape currentCombatant.Name) (Markup.Escape actionLabel))
           let bossDefOpt =
             if currentBoss.IsHumanoid && currentBoss.IsInNach && not currentBoss.IsStaggered then
               Some(Guard(AI.chooseActiveDefense currentBoss currentCombatant))
@@ -1011,13 +1022,13 @@ module Program =
 
           CombatLogger.recordTurn session round turnNumber choice playerBefore bossBefore playerResult
           RuntimeLog.write (
-            sprintf "combat round %d player turn: %s (%d events)" round choice playerResult.Events.Length)
+            sprintf "combat round %d player turn: %s (%d events)" round actionLabel playerResult.Events.Length)
 
           appendTurnTo combatLog nameOf currentCombatant.Id
-            (sprintf "Round %d — %s executes %s" round currentCombatant.Name (Display.intentLogLabel playerIntent currentCombatant))
+            (sprintf "Round %d — %s executes %s" round currentCombatant.Name actionLabel)
             playerResult.Events
 
-          Display.renderRollBreakdown choice currentCombatant.Name playerResult.Contest
+          Display.renderRollBreakdown (Markup.Escape actionLabel) currentCombatant.Name playerResult.Contest
           Display.logDamageSummary playerResult.Events bossBefore currentBoss
           playerResult.Events |> List.iter Display.logEvent
 
@@ -1151,6 +1162,24 @@ module Program =
      else
        currentCombatant)
 
+  /// Formats a target choice in multi-enemy combat so identical foes are distinguishable by live
+  /// HP percentage, initiative badge, and active status markers.
+  let formatGroupTargetChoice (index: int) (e: TowerEnemy) : string =
+    let c = e.Combatant
+    let hpPct =
+      if c.Health.Maximum <= 0 then 0
+      else int (Math.Round(float c.Health.Current / float c.Health.Maximum * 100.0))
+    let hpColor =
+      if hpPct > 60 then Theme.Green
+      elif hpPct >= 25 then Theme.Yellow
+      else Theme.Red
+    let tags =
+      [ if c.IsStaggered then sprintf "[bold %s]STAGGERED[/]" Theme.Green
+        if c.BleedStacks > 0 then sprintf "[%s]BLEED %d[/]" Theme.Red c.BleedStacks ]
+    let tagPart = if tags.IsEmpty then "" else " · " + String.concat " · " tags
+    sprintf "%d. [bold %s]%s[/]  [%s]HP %d%%[/] [grey](%d/%d)[/]  %s%s"
+      index Theme.Pink (Markup.Escape e.Name) hpColor hpPct c.Health.Current c.Health.Maximum (Display.tempoBadge c) tagPart
+
   /// Renders the multi-enemy engagement HUD: the full player panel on the left, a one-row-per-foe pack
   /// table on the right, and a combat-log pane spanning the bottom. The pack used to be one bordered
   /// panel per enemy, so a large pack pushed the player card off the top of the screen.
@@ -1195,6 +1224,7 @@ module Program =
     let maxRows = 7
     let shown = ordered |> List.truncate maxRows
     let hidden = ordered.Length - shown.Length
+    let focusedId = intentFor |> Option.map (fun (actor, _) -> actor.Id)
 
     let pack = Grid()
     pack.AddColumn(GridColumn().PadRight(3)) |> ignore
@@ -1204,9 +1234,33 @@ module Program =
     pack.AddColumn(GridColumn().PadRight(2)) |> ignore
     pack.AddColumn(GridColumn()) |> ignore
 
+    pack.AddRow(
+      Markup(sprintf "[bold %s]Foe[/]" Theme.Comment),
+      Markup(sprintf "[bold %s]HP[/]" Theme.Comment),
+      Markup(sprintf "[bold %s]Morale[/]" Theme.Comment),
+      Markup(sprintf "[bold %s]Armor[/]" Theme.Comment),
+      Markup(sprintf "[bold %s]Tempo[/]" Theme.Comment),
+      Markup(sprintf "[bold %s]Status[/]" Theme.Comment)
+    )
+    |> ignore
+
     for e in shown do
       let c = e.Combatant
       let standing = isStanding e
+      let isFocused = focusedId = Some c.Id
+      let focusPrefix = if isFocused then sprintf "[bold %s]▸ [/]" Theme.Yellow else "  "
+      let hpRatio = if c.Health.Maximum <= 0 then 0.0 else float c.Health.Current / float c.Health.Maximum
+      let hpBarColor =
+        if not standing then Theme.Comment
+        elif hpRatio > 0.60 then Theme.Green
+        elif hpRatio >= 0.25 then Theme.Yellow
+        else Theme.Red
+      let hpCell =
+        sprintf "%s [%s]%d/%d[/]"
+          (Display.renderMiniBar c.Health.Current c.Health.Maximum 5 hpBarColor)
+          (if standing then hpBarColor else Theme.Comment)
+          c.Health.Current
+          c.Health.Maximum
       let armorText =
         // Shredded armor with a raised shield is still soaking (plating counts in AbsorptionRatio) -- show the
         // live number, or the plating looks like it does nothing at 0 durability.
@@ -1246,8 +1300,8 @@ module Program =
         |> String.concat " "
 
       pack.AddRow(
-        Markup(sprintf "[bold %s]%s[/]" (if standing then Theme.Pink else Theme.Comment) (Markup.Escape e.Name)),
-        Markup(sprintf "[%s]%d/%d[/]" (if standing then Theme.Red else Theme.Comment) c.Health.Current c.Health.Maximum),
+        Markup(sprintf "%s[bold %s]%s[/]" focusPrefix (if standing then Theme.Pink else Theme.Comment) (Markup.Escape e.Name)),
+        Markup(hpCell),
         Markup(sprintf "[%s]%d/%d[/]" (if standing then Theme.Cyan else Theme.Comment) c.Morale.Current c.Morale.Maximum),
         Markup(armorText),
         Markup(if standing then Display.tempoBadge c else ""),
@@ -1421,7 +1475,7 @@ module Program =
         match livingNow with
         | [ only ] -> only
         | many ->
-          let indexed = many |> List.mapi (fun i e -> (sprintf "%d.  %s" (i + 1) e.Name, e))
+          let indexed = many |> List.mapi (fun i e -> (formatGroupTargetChoice (i + 1) e, e))
           let pick =
             Display.promptSelectionWithHelp
               (sprintf "[bold %s]Choose your target:[/]" Theme.Yellow)
@@ -1518,7 +1572,8 @@ module Program =
             |> List.filter (fun e -> e.Id <> target.Id)
             |> List.map (fun e -> e.Combatant)
 
-          AnsiConsole.MarkupLine(sprintf "\n[bold %s]%s executes %s...[/]" Theme.Green currentPlayer.Name choice)
+          let actionLabel = Display.intentLogLabel intent currentPlayer
+          AnsiConsole.MarkupLine(sprintf "\n[bold %s]%s executes %s...[/]" Theme.Green (Markup.Escape currentPlayer.Name) (Markup.Escape actionLabel))
           let playerBefore = currentPlayer
           let targetBefore = freshTarget
           let res = ActionResolver.resolveGroupTurn roller intent currentPlayer freshTarget freshOtherLiving
@@ -1530,7 +1585,7 @@ module Program =
           CombatLogger.recordTurn session round turnNum choice playerBefore targetBefore
             { Actor = res.Actor; Target = res.PrimaryTarget; Events = res.Events; Contest = None }
           turnNum <- turnNum + 1
-          appendTurn (sprintf "Round %d — %s uses %s on %s" round currentPlayer.Name choice target.Name) res.Events
+          appendTurn (sprintf "Round %d — %s uses %s on %s" round currentPlayer.Name actionLabel target.Name) res.Events
           currentPlayer <- res.Actor
           currentEnemies <-
             currentEnemies
@@ -1677,8 +1732,8 @@ module Program =
       | _ -> "Martial Master • Kinetic Force, Finesse Cadence & Bastion Defense"
 
     let panel =
-      Panel(Markup(sprintf "[bold %s]󰓥 CLASS AWAKENED: %s[/] [grey](%s)[/]\n[italic white]Equipped: %s  •  Combat Stance: %A[/]\n[grey]Bundle of sharpened caltrops recovered inside lid.[/]"
-        Theme.Green (player.Class.Name.ToUpperInvariant()) desc (Markup.Escape weapon) player.Stance))
+      Panel(Markup(sprintf "[bold %s]󰓥 CLASS AWAKENED: %s[/] [grey](%s)[/]\n[italic white]Equipped: %s  •  Combat Stance: %s[/]\n[grey]Bundle of sharpened caltrops recovered inside lid.[/]"
+        Theme.Green (player.Class.Name.ToUpperInvariant()) desc (Markup.Escape weapon) (Display.stanceDisplayName player.Stance)))
         .Border(BoxBorder.Heavy)
         .BorderStyle(Style(foreground = Nullable Theme.ColorGreen))
 
@@ -1800,6 +1855,7 @@ module Program =
                 SelectionPrompt<string>()
                   .Title(promptTitle)
                   .PageSize(12)
+                  .HighlightStyle(Theme.StylePromptHighlight)
                   .AddChoices([
                     formatMenuItem "󰈙 " "Interactive Story Mode" "Narrative prologue & aspect battles" Theme.Cyan
                     formatMenuItem "󰒋 " "Ascend The Infinite Tower" "Roguelike procedural dungeon crawl" Theme.Yellow

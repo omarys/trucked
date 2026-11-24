@@ -94,6 +94,50 @@ type VimConsole(inner: IAnsiConsole, enableHelpHotkey: bool, enableVimKeys: bool
 
 module Display =
 
+  /// Friendly spaced name for a martial stance (never raw F# union names like "PowerStance").
+  let stanceDisplayName (stance: CombatStance) : string =
+    match stance with
+    | CombatStance.PowerStance -> "Power Stance"
+    | CombatStance.AgilityStance -> "Agility Stance"
+    | CombatStance.DisciplineStance -> "Discipline Stance"
+
+  /// Sleeps up to `durationMs`, returning `true` immediately if the player taps a key to skip.
+  /// Safe when stdin is redirected (never polls `Console.KeyAvailable` on a piped stream).
+  let sleepSkippable (durationMs: int) : bool =
+    if durationMs <= 0 then
+      false
+    elif Console.IsInputRedirected then
+      Thread.Sleep(durationMs)
+      false
+    else
+      let sliceMs = 25
+      let mutable remaining = durationMs
+      let mutable skipped = false
+      while remaining > 0 && not skipped do
+        if Console.KeyAvailable then
+          Console.ReadKey(true) |> ignore
+          skipped <- true
+        else
+          let step = Math.Min(sliceMs, remaining)
+          Thread.Sleep(step)
+          remaining <- remaining - step
+      skipped
+
+  /// Renders a prompt line and waits for a keypress when stdin is interactive; no-ops when piped.
+  let waitForKey (promptMarkup: string) : unit =
+    if not (String.IsNullOrEmpty promptMarkup) then
+      AnsiConsole.MarkupLine(promptMarkup)
+    if not Console.IsInputRedirected then
+      Console.ReadKey(true) |> ignore
+
+  /// Compact inline bar (e.g. for pack HP cells or XP progress).
+  let renderMiniBar (current: int) (maxVal: int) (width: int) (colorHex: string) : string =
+    let safeWidth = Math.Max(1, width)
+    let safeMax = Math.Max(1, maxVal)
+    let safeCurr = Math.Clamp(current, 0, safeMax)
+    let filledCount = Math.Clamp(int (Math.Round(float safeCurr / float safeMax * float safeWidth)), 0, safeWidth)
+    sprintf "[%s]%s[/][%s]%s[/]" colorHex (String('█', filledCount)) Theme.CurrentLine (String('░', safeWidth - filledCount))
+
   /// One wear ladder, two vocabularies: a blade is honed and a mage's mana is re-centred, so the
   /// readout says "Weapon Integrity" on the physical plane and "Mana Integrity" on the mental one.
   /// Returns the row label, the colour and the description.
@@ -204,6 +248,21 @@ module Display =
     sprintf "%s [%s]%s[/][%s]%s[/] [bold %s]%3d%%[/]%s"
       (label.PadRight barLabelWidth) warnColor filled Theme.CurrentLine empty Theme.Foreground m.Value debuffTag
 
+  /// Formats armor durability and live absorption soak, accounting for raised-shield plating
+  /// when base armor is shredded.
+  let formatArmorReadout (armor: ArmorIntegrity) : string =
+    let soakPct = int (armor.AbsorptionRatio * 100.0)
+    if armor.IsShredded && armor.Boost <= 0 then
+      sprintf "[bold blink %s]SHREDDED (0%% soak) ⚠[/]" Theme.Red
+    elif armor.IsShredded then
+      sprintf "[%s]0[/][%s]/[/]%d [bold %s](+%d%% shield soak)[/]" Theme.Red Theme.Comment armor.Max Theme.Green soakPct
+    else
+      sprintf "[%s]%4d[/][%s]/[/]%4d [%s](%d%% soak)[/]" Theme.Comment armor.Current Theme.Comment armor.Max Theme.Yellow soakPct
+
+  /// Renders an Armor row padded to the same label column (`barLabelWidth`) as `renderBar` and `renderMeter`.
+  let renderArmorRow (label: string) (armor: ArmorIntegrity) : string =
+    sprintf "%s %s" (label.PadRight barLabelWidth) (formatArmorReadout armor)
+
   let private renderPips (count: int) (maxPips: int) (colorHex: string) : string =
     let clamped = Math.Clamp(count, 0, maxPips)
     let filled = String('◆', clamped)
@@ -307,15 +366,21 @@ module Display =
     // Shared Entropy & Visual Pip Ramp
     grid.AddRow(Markup(renderMeter "󰈸 Recklessness" c.Meters.Recklessness Theme.Orange)) |> ignore
     let guardStacks = if c.Plane = Mental then c.Focus else c.Inertia
+    let flowBonus =
+      if c.Flow >= 5 then sprintf "[bold %s](+%d%% · MAX)[/]" Theme.Yellow (c.Flow * 6)
+      else sprintf "[grey](+%d%%)[/]" (c.Flow * 6)
+    let momBonus =
+      if c.Momentum >= 5 then sprintf "[bold %s](+%d%% · MAX)[/]" Theme.Yellow c.Momentum
+      else sprintf "[grey](+%d%%)[/]" c.Momentum
     let rampText =
       sprintf
-        "[%s]Flow[/] %s [grey](+%d%%)[/] · [%s]Mom[/] %s [grey](+%d%%)[/] · [%s]Guard[/] %s · [%s]%d hit chain[/]"
+        "[%s]Flow[/] %s %s · [%s]Mom[/] %s %s · [%s]Guard[/] %s · [%s]%d hit chain[/]"
         Theme.Green
         (renderPips c.Flow 5 Theme.Green)
-        (c.Flow * 6)
+        flowBonus
         Theme.Red
         (renderPips c.Momentum 5 Theme.Red)
-        c.Momentum
+        momBonus
         Theme.Cyan
         (renderPips guardStacks 5 Theme.Cyan)
         Theme.Pink
@@ -350,7 +415,7 @@ module Display =
     | CollapseState.Stable -> ()
 
     Panel(grid)
-      .Header(sprintf "[bold %s] %s [/] %s" headerColor c.Name (tempoBadge c))
+      .Header(sprintf "[bold %s] %s [/] %s" headerColor (Markup.Escape c.Name) (tempoBadge c))
       .Border(BoxBorder.Rounded)
       .BorderColor(borderColor)
       .Expand()
@@ -401,7 +466,7 @@ module Display =
     for line in compactCombatantLines c observerOpt do
       grid.AddRow(Markup(line)) |> ignore
     Panel(grid)
-      .Header(sprintf "[bold %s] %s [/] %s" headerColor c.Name (tempoBadge c))
+      .Header(sprintf "[bold %s] %s [/] %s" headerColor (Markup.Escape c.Name) (tempoBadge c))
       .Border(BoxBorder.Rounded)
       .BorderColor(borderColor)
       .Expand()
@@ -458,7 +523,7 @@ module Display =
       | ProwessStrike false ->
         sprintf "⚔️ [%s]Prowess Pressure[/]" Theme.Purple,
         "Circling with measured poise to probe flaws and build the combat ramp.",
-        sprintf "Frustration defensive poise with [bold %s]Power Guard-Break[/]." Theme.Red,
+        sprintf "Overwhelm defensive poise with [bold %s]Power Guard-Break[/]." Theme.Red,
         "Discipline"
       | ShieldBash true ->
         sprintf "⚡ [bold %s]SHIELD SLAM WINDUP[/]" Theme.Purple,
@@ -710,20 +775,38 @@ module Display =
     let plain = Text.RegularExpressions.Regex.Replace(title, @"\[[^\]]*\]", "").Trim()
     sprintf "%s (%s)" plain vector
 
+  /// Severity framing for a telegraphed enemy action: heavy windups and finishers flash in heavy red,
+  /// standard offensive vectors use double yellow, defensive/recovery postures use rounded cyan, and
+  /// obscured postures sit quietly in muted slate.
+  let telegraphVisuals (vector: string) (intent: ActionIntent) : Color * BoxBorder * string =
+    let isHeavy =
+      match intent with
+      | ExecuteStrike _ -> true
+      | StandardAttack (ForceStrike true | FinesseCadence true | ProwessStrike true | ArcaneCataclysm true | TraumaAttack _) -> true
+      | _ -> false
+
+    match vector with
+    | "Obscured" -> Theme.ColorComment, BoxBorder.Rounded, sprintf "[bold %s] 󰓥 INTENT OBSCURED [/]" Theme.Comment
+    | "Finisher" -> Theme.ColorRed, BoxBorder.Heavy, sprintf "[bold %s] ☠ LETHAL FINISHER TELEGRAPHED [/]" Theme.Red
+    | "Defensive" | "Defense" -> Theme.ColorCyan, BoxBorder.Rounded, sprintf "[bold %s] 🛡️ DEFENSIVE POSTURE [/]" Theme.Cyan
+    | _ when isHeavy -> Theme.ColorRed, BoxBorder.Heavy, sprintf "[bold %s] ⚠ HEAVY WINDUP TELEGRAPHED [/]" Theme.Red
+    | _ -> Theme.ColorYellow, BoxBorder.Double, sprintf "[bold %s] ⚡ TELEGRAPHED INTENT [/]" Theme.Yellow
+
   /// The wind-up banner, shared by the lone-duel HUD and the pack HUD. A telegraphed heavy strike that
   /// nobody prints reads as silence, and silence is the one thing an interrupt window cannot afford.
   let writeTelegraphBanner (player: Combatant) (enemy: Combatant) (intent: ActionIntent) =
-    let title, desc, tip, _ = formatTelegraphedIntentWithLadder player enemy intent
+    let title, desc, tip, vector = formatTelegraphedIntentWithLadder player enemy intent
+    let borderColor, borderStyle, headerLead = telegraphVisuals vector intent
     let telegraphGrid = Grid()
     telegraphGrid.AddColumn(GridColumn()) |> ignore
-    telegraphGrid.AddRow(Markup(sprintf "  [bold %s]󰓥 Telegraphed Windup:[/] %s" Theme.Yellow title)) |> ignore
+    telegraphGrid.AddRow(Markup(sprintf "  [bold %s]󰓥 Windup:[/] %s" Theme.Yellow title)) |> ignore
     telegraphGrid.AddRow(Markup(sprintf "  [grey]%s[/]" desc)) |> ignore
     telegraphGrid.AddRow(Markup(sprintf "  [italic %s]💡 Counterplay:[/] %s" Theme.Green tip)) |> ignore
     AnsiConsole.Write(
       Panel(telegraphGrid)
-        .Header(sprintf "[bold %s] ⚡ TELEGRAPHED INTENT (%s) ── READ THE WINDUP [/]" Theme.Yellow (Markup.Escape enemy.Name))
-        .Border(BoxBorder.Double)
-        .BorderColor(Theme.ColorYellow)
+        .Header(sprintf "%s [grey](%s)[/]" headerLead (Markup.Escape enemy.Name))
+        .Border(borderStyle)
+        .BorderColor(borderColor)
         .Expand()
     )
 
@@ -897,6 +980,31 @@ module Display =
     sprintf "  [grey]•[/] [bold %s]%s[/] takes [bold %s]%d %A[/]%s%s"
       nameColor (Markup.Escape (nameOf d.TargetId)) Theme.Red d.Amount d.Plane crit comp
 
+  /// Formats any combat event for the rolling HUD combat log with semantic color-coding and
+  /// guaranteed Spectre markup escaping.
+  let formatCombatLogEvent (nameOf: CombatantId -> string) (playerId: CombatantId) (evt: CombatEvent) : string =
+    match evt with
+    | CombatEvent.DamageApplied d ->
+      formatDamageLogLine nameOf (d.TargetId = playerId) d
+    | CombatEvent.Executed _ ->
+      sprintf "  [bold %s]☠ %s[/]" Theme.Red (Markup.Escape (CombatLogger.formatCombatEvent evt))
+    | CombatEvent.CollapseTriggered _ ->
+      sprintf "  [bold %s]⚠ %s[/]" Theme.Red (Markup.Escape (CombatLogger.formatCombatEvent evt))
+    | CombatEvent.ActionInterrupted _ | CombatEvent.IndesSeized _ | CombatEvent.RiposteExecuted _ ->
+      sprintf "  [bold %s]⚡ %s[/]" Theme.Cyan (Markup.Escape (CombatLogger.formatCombatEvent evt))
+    | CombatEvent.CombatantStaggered _ ->
+      sprintf "  [bold %s]💥 %s[/]" Theme.Orange (Markup.Escape (CombatLogger.formatCombatEvent evt))
+    | CombatEvent.TempoShifted _ ->
+      sprintf "  [%s]↺ %s[/]" Theme.Yellow (Markup.Escape (CombatLogger.formatCombatEvent evt))
+    | CombatEvent.GambitDeclared _ ->
+      sprintf "  [%s]⚡ %s[/]" Theme.Orange (Markup.Escape (CombatLogger.formatCombatEvent evt))
+    | CombatEvent.GambitPunished _ ->
+      sprintf "  [bold %s]✖ %s[/]" Theme.Red (Markup.Escape (CombatLogger.formatCombatEvent evt))
+    | CombatEvent.CollapseRecovered _ | CombatEvent.BreathStabilized _ | CombatEvent.FormStabilized _ ->
+      sprintf "  [%s]✓ %s[/]" Theme.Green (Markup.Escape (CombatLogger.formatCombatEvent evt))
+    | other ->
+      sprintf "  [grey]• %s[/]" (Markup.Escape (CombatLogger.formatCombatEvent other))
+
   let logDamageSummary (events: CombatEvent list) (targetBefore: Combatant) (targetAfter: Combatant) =
     let applied =
       events
@@ -964,22 +1072,22 @@ module Display =
         AnsiConsole.MarkupLine(sprintf "  [bold %s]>> PASSIVE:[/] Vital Opening! Dealt [bold %s]+%d %s bonus damage[/]!" Theme.Yellow Theme.Yellow bonusDmg plStr)
 
     | CombatEvent.GambitDeclared (_, name, cost) ->
-      AnsiConsole.MarkupLine(sprintf "  [bold %s]⚡ GAMBIT DECLARED:[/] [bold underline %s]%s[/] (+%d Recklessness)" Theme.Orange Theme.Orange (gambitDisplayName name) cost)
+      AnsiConsole.MarkupLine(sprintf "  [bold %s]⚡ GAMBIT DECLARED:[/] [bold underline %s]%s[/] (+%d Recklessness)" Theme.Orange Theme.Orange (Markup.Escape (gambitDisplayName name)) cost)
 
     | CombatEvent.GambitPunished (_, reason) ->
-      AnsiConsole.MarkupLine(sprintf "  [bold %s]✖ GAMBIT PUNISHED:[/] %s" Theme.Red reason)
+      AnsiConsole.MarkupLine(sprintf "  [bold %s]✖ GAMBIT PUNISHED:[/] %s" Theme.Red (Markup.Escape reason))
 
     | CombatEvent.FormStabilized (_, drained, gained) ->
       AnsiConsole.MarkupLine(sprintf "  [bold %s]✓ FORM STABILIZED:[/] Drained [bold %s]%d Recklessness[/], gained [bold %s]%d guard stacks[/]." Theme.Green Theme.Green drained Theme.Purple gained)
 
     | CombatEvent.BreathStabilized (_, summary, morale) ->
-      AnsiConsole.MarkupLine(sprintf "  [bold %s]🌬 STEADY BREATHING:[/] %s (+[bold %s]%d Morale[/])." Theme.Cyan summary Theme.Green morale)
+      AnsiConsole.MarkupLine(sprintf "  [bold %s]🌬 STEADY BREATHING:[/] %s (+[bold %s]%d Morale[/])." Theme.Cyan (Markup.Escape summary) Theme.Green morale)
 
     | CombatEvent.CollapseRecovered _ ->
       AnsiConsole.MarkupLine(sprintf "  [bold %s]✦ POSTURE RECOVERED:[/] All strain meters vented below critical thresholds; collapsed state cleared!" Theme.Green)
 
     | CombatEvent.ComboReset (_, reason) ->
-      AnsiConsole.MarkupLine(sprintf "  [%s]• COMBO RESET:[/] %s" Theme.Comment reason)
+      AnsiConsole.MarkupLine(sprintf "  [%s]• COMBO RESET:[/] %s" Theme.Comment (Markup.Escape reason))
 
     | CombatEvent.CollapseTriggered (_, reason) ->
       AnsiConsole.MarkupLine(sprintf "  [bold %s on %s] ⚠ THRESHOLD SNAP: Target suffered COLLAPSE (%A)! [/]" Theme.Foreground Theme.Red reason)
@@ -988,19 +1096,19 @@ module Display =
       AnsiConsole.MarkupLine(sprintf "  [bold %s on %s] ☠ EXECUTION DELIVERED ([[%A]]): Lethal blow concluded combat. ☠ [/]" Theme.Foreground Theme.Red plane)
 
     | CombatEvent.EquipmentProcTriggered (name, _, desc) ->
-      AnsiConsole.MarkupLine(sprintf "  [bold %s]⚙ EQUIPMENT PROC:[/] [bold %s]%s[/] - %s" Theme.Cyan Theme.Foreground name desc)
+      AnsiConsole.MarkupLine(sprintf "  [bold %s]⚙ EQUIPMENT PROC:[/] [bold %s]%s[/] - %s" Theme.Cyan Theme.Foreground (Markup.Escape name) (Markup.Escape desc))
 
     | CombatEvent.WeaponDegraded (_, newCond) ->
       AnsiConsole.MarkupLine(sprintf "  [bold %s]⚙ WEAPON DEGRADED:[/] Weapon integrity dropped to [bold %s]%A[/]!" Theme.Red Theme.Red newCond)
 
     | CombatEvent.StanceShifted (_, oldS, newS) ->
-      AnsiConsole.MarkupLine(sprintf "  [bold %s]↺ STANCE SHIFTED:[/] Shifted from %A to [bold underline %s]%A[/]." Theme.Purple oldS Theme.Purple newS)
+      AnsiConsole.MarkupLine(sprintf "  [bold %s]↺ STANCE SHIFTED:[/] Shifted from %s to [bold underline %s]%s[/]." Theme.Purple (stanceDisplayName oldS) Theme.Purple (stanceDisplayName newS))
 
     | CombatEvent.RiposteExecuted (_, _, dmg) ->
       AnsiConsole.MarkupLine(sprintf "  [bold %s]⚔ RIPOSTE:[/] Stance predicted! Reactive counter dealt [bold %s]%d damage[/]!" Theme.Purple Theme.Red dmg)
 
     | CombatEvent.DisarmExecuted (_, _, reason) ->
-      AnsiConsole.MarkupLine(sprintf "  [bold %s]⚡ DISARM:[/] %s" Theme.Orange reason)
+      AnsiConsole.MarkupLine(sprintf "  [bold %s]⚡ DISARM:[/] %s" Theme.Orange (Markup.Escape reason))
 
     | CombatEvent.BleedTicked (_, dmg, rem) ->
       AnsiConsole.MarkupLine(sprintf "  [bold %s]🩸 BLEED TICK:[/] Took [bold %s]%d somatic bleed damage[/] (%d stacks remaining)." Theme.Red Theme.Red dmg rem)
@@ -1044,13 +1152,13 @@ module Display =
       AnsiConsole.MarkupLine(sprintf "  [bold %s]🛡️ WARD ABSORPTION:[/] Arcane barrier absorbed [bold %s]%d damage[/]! (Barrier Remaining: [bold %s]%d[/])" Theme.Cyan Theme.Yellow soaked Theme.Cyan remaining)
 
     | CombatEvent.OpponentDisoriented (_, _, reason) ->
-      AnsiConsole.MarkupLine(sprintf "  [bold %s]🌀 DISORIENTED:[/] %s" Theme.Orange reason)
+      AnsiConsole.MarkupLine(sprintf "  [bold %s]🌀 DISORIENTED:[/] %s" Theme.Orange (Markup.Escape reason))
 
     | CombatEvent.CataclysmSplashed (_, _, dmg) ->
-      AnsiConsole.MarkupLine(sprintf "  [bold %s]💥 CATACLYSM SPLASH:[/] Frustrationing arcane rupture splashed [bold %s]%d mental damage[/] to adjacent target!" Theme.Purple Theme.Cyan dmg)
+      AnsiConsole.MarkupLine(sprintf "  [bold %s]💥 CATACLYSM SPLASH:[/] Overwhelming arcane rupture splashed [bold %s]%d mental damage[/] to adjacent target!" Theme.Purple Theme.Cyan dmg)
 
     | CombatEvent.PreparationDeployed (_, prepType, _, desc) ->
-      AnsiConsole.MarkupLine(sprintf "  [bold %s]🎯 PREPARATION DEPLOYED:[/] [bold underline %s]%s[/] - %s" Theme.Green Theme.Cyan prepType.Name desc)
+      AnsiConsole.MarkupLine(sprintf "  [bold %s]🎯 PREPARATION DEPLOYED:[/] [bold underline %s]%s[/] - %s" Theme.Green Theme.Cyan (Markup.Escape prepType.Name) (Markup.Escape desc))
 
     | CombatEvent.ShockwaveSurplusDamage (_, _, surplusHits, flatDmg) ->
       AnsiConsole.MarkupLine(sprintf "  [bold %s]💥 SHOCKWAVE SLAM:[/] Surplus NetHits (%d) erupted for [bold %s]%d flat damage[/] to flanker!" Theme.Orange surplusHits Theme.Red flatDmg)
@@ -1072,7 +1180,7 @@ module Display =
       AnsiConsole.MarkupLine(sprintf "  [bold %s]⚡ INDES SEIZURE:[/] Defenses overwhelmed attack (Margin: %d >= Threshold: %d); seized the Vor!" Theme.Yellow margin thresh)
 
     | CombatEvent.TempoShifted (_, _, reason) ->
-      AnsiConsole.MarkupLine(sprintf "  [bold %s]󰒋 TEMPO SHIFTED:[/] %s" Theme.Yellow reason)
+      AnsiConsole.MarkupLine(sprintf "  [bold %s]󰒋 TEMPO SHIFTED:[/] %s" Theme.Yellow (Markup.Escape reason))
 
     | CombatEvent.BastionZoneErected _ ->
       AnsiConsole.MarkupLine(sprintf "  [bold %s]🏰 BASTION ZONE:[/] Polearm planted! Limits simultaneous attackers strictly to 3 (frontline choke)!" Theme.Cyan)
@@ -1084,24 +1192,24 @@ module Display =
       AnsiConsole.MarkupLine(sprintf "  [bold %s]📖 HERALDIC TREATISE:[/] Tactical dossiers reviewed; granted [bold %s]+%d ramp stacks[/] on all visible foes!" Theme.Purple Theme.Green stacks)
 
     | CombatEvent.PsychicHemorrhageInflicted (_, _, bleedStacks, disparity) ->
-      AnsiConsole.MarkupLine(sprintf "  [bold %s]🩸 CRANIAL HEMORRHAGE:[/] Frustrationing cognitive disparity (%+d) ruptured cerebral vessels! Inflicted [bold %s]+%d Bleed Stacks[/]!" Theme.Red disparity Theme.Red bleedStacks)
+      AnsiConsole.MarkupLine(sprintf "  [bold %s]🩸 CRANIAL HEMORRHAGE:[/] Overwhelming cognitive disparity (%+d) ruptured cerebral vessels! Inflicted [bold %s]+%d Bleed Stacks[/]!" Theme.Red disparity Theme.Red bleedStacks)
 
     | CombatEvent.PsychicShockwaveResonated (_, _, dmg) ->
-      AnsiConsole.MarkupLine(sprintf "  [bold %s]🔮 PSYCHIC RESONANCE:[/] Frustrationing mental shockwave resonated into flanker for [bold %s]%d damage[/]!" Theme.Purple Theme.Cyan dmg)
+      AnsiConsole.MarkupLine(sprintf "  [bold %s]🔮 PSYCHIC RESONANCE:[/] Overwhelming mental shockwave resonated into flanker for [bold %s]%d damage[/]!" Theme.Purple Theme.Cyan dmg)
 
     | CombatEvent.PhantasmalSwapExecuted (_, _, success, note) ->
       let color = if success then Theme.Cyan else Theme.Orange
-      AnsiConsole.MarkupLine(sprintf "  [bold %s]🪞 PHANTASMAL SWAP:[/] %s" color note)
+      AnsiConsole.MarkupLine(sprintf "  [bold %s]🪞 PHANTASMAL SWAP:[/] %s" color (Markup.Escape note))
 
     | CombatEvent.DestabilizingWardTriggered (_, _, outcome, _) ->
-      AnsiConsole.MarkupLine(sprintf "  [bold %s]🛡️ DESTABILIZING WARD:[/] %s" Theme.Yellow outcome)
+      AnsiConsole.MarkupLine(sprintf "  [bold %s]🛡️ DESTABILIZING WARD:[/] %s" Theme.Yellow (Markup.Escape outcome))
 
     | CombatEvent.SynapticMindShockDisrupted (_, _, fatigue, disrupted) ->
       let statusStr = if disrupted then " [bold #ff5555](Incoming strike completely shattered!)[/]" else ""
       AnsiConsole.MarkupLine(sprintf "  [bold %s]🧠 SYNAPTIC MIND-SHOCK:[/] Mind-shock disrupted attacker's focus! Inflicted [bold %s]+%d Cognitive Fatigue[/]!%s" Theme.Purple Theme.Pink fatigue statusStr)
 
     | CombatEvent.PassiveGenerationTriggered (_, desc) ->
-      AnsiConsole.MarkupLine(sprintf "  [bold %s]✦ CLASS MASTERY:[/] %s" Theme.Green desc)
+      AnsiConsole.MarkupLine(sprintf "  [bold %s]✦ CLASS MASTERY:[/] %s" Theme.Green (Markup.Escape desc))
 
     | CombatEvent.RetributionReflected (_, _, dmg, frust) ->
       AnsiConsole.MarkupLine(sprintf "  [bold %s]⚔️ RETRIBUTION AURA:[/] Barrier reflected [bold %s]%d radiant damage[/] back to attacker! Inflicted [bold %s]+%d Frustration[/]!" Theme.Yellow Theme.Cyan dmg Theme.Orange frust)
@@ -1126,7 +1234,7 @@ module Display =
       AnsiConsole.MarkupLine(sprintf "  [bold %s]⚡ FADING DRAIN:[/] Channeling [bold %s]%s[/] burned through mental reserves (+%d Cognitive Fatigue, +%d Recklessness)!" Theme.Purple Theme.Cyan formName fatigueDrain reckSpike)
 
     | CombatEvent.MonsterTraitTriggered (_, traitName, effectDesc) ->
-      AnsiConsole.MarkupLine(sprintf "  [bold %s]🐾 TRAIT ([%s]%s[/]):[/] %s" Theme.Purple Theme.Yellow traitName effectDesc)
+      AnsiConsole.MarkupLine(sprintf "  [bold %s]🐾 TRAIT ([%s]%s[/]):[/] %s" Theme.Purple Theme.Yellow (Markup.Escape traitName) (Markup.Escape effectDesc))
 
     | CombatEvent.AcidicArmorCorroded (_, corrosion) ->
       AnsiConsole.MarkupLine(sprintf "  [bold %s]🧪 ACIDIC CORROSION:[/] Searing acidic blood corroded [bold %s]-%d Armor durability[/]!" Theme.Green Theme.Red corrosion)
@@ -1135,10 +1243,10 @@ module Display =
       AnsiConsole.MarkupLine(sprintf "  [bold %s]🔥 MOLTEN AURA:[/] Searing volcanic heat scorched attacker for [bold %s]%d burn damage[/]!" Theme.Orange Theme.Red burn)
 
     | CombatEvent.AlchemicalTrophyHarvested (_, trophyName, value) ->
-      AnsiConsole.MarkupLine(sprintf "  [bold %s]💎 TROPHY HARVESTED:[/] Obtained [bold %s]%s[/] (Essence Value: [bold %s]%d[/])!" Theme.Cyan Theme.Yellow trophyName Theme.Cyan value)
+      AnsiConsole.MarkupLine(sprintf "  [bold %s]💎 TROPHY HARVESTED:[/] Obtained [bold %s]%s[/] (Essence Value: [bold %s]%d[/])!" Theme.Cyan Theme.Yellow (Markup.Escape trophyName) Theme.Cyan value)
 
     | CombatEvent.ActionInterrupted (_, _, tech, reason) ->
-      AnsiConsole.MarkupLine(sprintf "  [bold %s]🛡️ TECHNIQUE COUNTER (%s):[/] [bold %s]%s[/]" Theme.Cyan tech Theme.Yellow reason)
+      AnsiConsole.MarkupLine(sprintf "  [bold %s]🛡️ TECHNIQUE COUNTER (%s):[/] [bold %s]%s[/]" Theme.Cyan (Markup.Escape tech) Theme.Yellow (Markup.Escape reason))
 
     | CombatEvent.StaffSiphoned (_, _, fatigue, reck, ward) ->
       AnsiConsole.MarkupLine(sprintf "  [bold %s]✨ STAFF SIPHON:[/] Siphoned mental clarity (-%d Fatigue, -%d Recklessness) and reinforced Arcane Ward (+%d Barrier)!" Theme.Cyan fatigue reck ward)
@@ -1147,16 +1255,16 @@ module Display =
       AnsiConsole.MarkupLine(sprintf "  [bold %s]🛡️ BASTION SHIELD:[/] Plating held up (+%d Armor Boost) and guard braced (+%d guard stacks)!" Theme.Green armor stacks)
 
     | CombatEvent.GuardSteeled (_, stacks) ->
-      AnsiConsole.MarkupLine(sprintf "  [bold %s]🛡️ GUARD STEELED:[/] Poise/Poise sharpened through the successful defence (+%d Guard Stack)!" Theme.Cyan stacks)
+      AnsiConsole.MarkupLine(sprintf "  [bold %s]🛡️ GUARD STEELED:[/] Guard & Poise sharpened through the successful defence (+%d Guard Stack)!" Theme.Cyan stacks)
 
     | CombatEvent.PainShockSuffered (_, dmg, pct, poise, resisted) ->
       if resisted then
         AnsiConsole.MarkupLine(sprintf "  [bold %s]⚡ PAIN SHOCK RESISTED:[/] Target shrugged off severe somatic trauma (%d damage, %d%% Max HP) with %d Poise!" Theme.Cyan dmg pct poise)
       else
-        AnsiConsole.MarkupLine(sprintf "  [bold %s]⚡ PAIN SHOCK COLLAPSE:[/] Target buckled under severe trauma (%d damage, %d%% Max HP; needed %d Poise, had %d)!" Theme.Red dmg pct (pct * 2) poise)
+        AnsiConsole.MarkupLine(sprintf "  [bold %s]⚡ PAIN SHOCK (TEMPO LOST):[/] Target buckled under severe trauma (%d damage, %d%% Max HP; needed %d Poise, had %d) — yielded Vor (+10 Frustration/Exhaustion)!" Theme.Red dmg pct (pct * 2) poise)
 
     | CombatEvent.CombatantStaggered (_, reason) ->
-      AnsiConsole.MarkupLine(sprintf "  [bold %s]💥 STAGGERED:[/] Target lost footing and dropped guard (%s)!" Theme.Red reason)
+      AnsiConsole.MarkupLine(sprintf "  [bold %s]💥 STAGGERED:[/] Target lost footing and dropped guard (%s)!" Theme.Red (Markup.Escape reason))
 
     | CombatEvent.StaggerRecovered _ ->
       AnsiConsole.MarkupLine(sprintf "  [bold %s]🔄 RECOVERED:[/] Target recovered from stagger." Theme.Cyan)
@@ -1165,7 +1273,7 @@ module Display =
       AnsiConsole.MarkupLine(sprintf "  [bold %s]󰒋 TACTICAL OUTMANEUVER:[/] Martial read outplayed opponent (Margin +%d), inflicting +%d Frustration!" Theme.Purple margin frustration)
 
     | CombatEvent.ActiveDefenseDeclared (_, defName) ->
-      AnsiConsole.MarkupLine(sprintf "  [bold %s]🛡️ ACTIVE DEFENSE:[/] Combatant assumed %s posture!" Theme.Cyan defName)
+      AnsiConsole.MarkupLine(sprintf "  [bold %s]🛡️ ACTIVE DEFENSE:[/] Combatant assumed %s posture!" Theme.Cyan (Markup.Escape defName))
 
     | CombatEvent.DefenseAffinityResolved (_, _, isCounter, mitPct) ->
       if isCounter then
@@ -1174,10 +1282,10 @@ module Display =
         AnsiConsole.MarkupLine(sprintf "  [bold %s]⚠ AFFINITY VULNERABILITY:[/] Defense was vulnerable to incoming attack vector (%d%% damage penalty)!" Theme.Red mitPct)
 
     | CombatEvent.UnattackedStanceBenefit (_, defName, benefit) ->
-      AnsiConsole.MarkupLine(sprintf "  [bold %s]󰓥 UNATTACKED STANCE BENEFIT:[/] %s: %s" Theme.Green defName benefit)
+      AnsiConsole.MarkupLine(sprintf "  [bold %s]󰓥 UNATTACKED STANCE BENEFIT:[/] %s: %s" Theme.Green (Markup.Escape defName) (Markup.Escape benefit))
 
     | CombatEvent.BeastFled (_, name) ->
-      AnsiConsole.MarkupLine(sprintf "  [bold %s]🐾 BEAST FLED:[/] The critically wounded %s scrambled into the shadows and fled the battle!" Theme.Yellow name)
+      AnsiConsole.MarkupLine(sprintf "  [bold %s]🐾 BEAST FLED:[/] The critically wounded %s scrambled into the shadows and fled the battle!" Theme.Yellow (Markup.Escape name))
 
     | CombatEvent.BeastSpared _ ->
       AnsiConsole.MarkupLine(sprintf "  [bold %s]🕊️ MERCY EXTENDED:[/] Spared the wounded beast! Calmed Recklessness to 0 and restored Morale!" Theme.Green)
@@ -1189,10 +1297,10 @@ module Display =
       AnsiConsole.MarkupLine(sprintf "  [bold %s]💨 KNOCKBACK:[/] Heavy kinetic impact sent target flying back %d tile(s)!" Theme.Yellow tiles)
 
     | CombatEvent.HazardPushed (_, hazard, dmg, desc) ->
-      AnsiConsole.MarkupLine(sprintf "  [bold %s]🌋 HAZARD IMPACT (%s):[/] %s [bold %s](-%d HP)[/]" Theme.Orange hazard desc Theme.Red dmg)
+      AnsiConsole.MarkupLine(sprintf "  [bold %s]🌋 HAZARD IMPACT (%s):[/] %s [bold %s](-%d HP)[/]" Theme.Orange (Markup.Escape hazard) (Markup.Escape desc) Theme.Red dmg)
 
     | CombatEvent.RelicEffectTriggered (_, relicName, summary) ->
-      AnsiConsole.MarkupLine(sprintf "  [bold %s]✨ RELIC TRIGGER ([%s]%s[/]):[/] %s" Theme.Cyan Theme.Yellow relicName summary)
+      AnsiConsole.MarkupLine(sprintf "  [bold %s]✨ RELIC TRIGGER ([%s]%s[/]):[/] %s" Theme.Cyan Theme.Yellow (Markup.Escape relicName) (Markup.Escape summary))
 
   /// Creates the Panel for the comprehensive Symbol & Glyph Reference Guide
   let createSymbolAndGlyphLegendPanel () : Panel =
@@ -1214,8 +1322,10 @@ module Display =
     controlsTable.AddRow(Markup("[bold white]Arrows / Vim (H J K L)[/]"), Markup("Tower Mode (Locomotion)"), Markup("Move player North (K/Up), South (J/Down), West (H/Left), East (L/Right).")) |> ignore
     controlsTable.AddRow(Markup("[bold white]Y / U / B / N (Keypad)[/]"), Markup("Tower Mode (Locomotion)"), Markup("Diagonal movement: NW (Y/7), NE (U/9), SW (B/1), SE (N/3).")) |> ignore
     controlsTable.AddRow(Markup("[bold white]X [/] or [bold white]Semicolon (;)[/]"), Markup("Tower Mode"), Markup("Toggle Tile & Hazard Reticle Inspection Mode to examine distant cells.")) |> ignore
-    controlsTable.AddRow(Markup("[bold white]Spacebar [/] or [bold white]Period (.)[/]"), Markup("Tower Mode"), Markup("Stand ground / Wait a turn to observe ambient flow and effects.")) |> ignore
+    controlsTable.AddRow(Markup("[bold white]Spacebar [/] or [bold white]Period (.)[/]"), Markup("Tower Mode"), Markup("Rest & Hone / Center Mind: recover vitals, repair gear, and widen sight arc.")) |> ignore
+    controlsTable.AddRow(Markup("[bold white]I [/]"), Markup("Tower Mode"), Markup("Open Inventory to inspect, sort, and use salvaged consumables.")) |> ignore
     controlsTable.AddRow(Markup("[bold white]C [/]"), Markup("Tower Mode"), Markup("Open the Character Sheet: level, mastery tier, XP progress, and the full 12-attribute matrix.")) |> ignore
+    controlsTable.AddRow(Markup("[bold white]V [/]"), Markup("Tower Mode"), Markup("Open the scrollable Chronicle Log to review full floor history.")) |> ignore
     controlsTable.AddRow(Markup("[bold white]J / K [/] or [bold white]Arrows[/]"), Markup("Story & Duel Prompts"), Markup("Vim navigation up/down through tactical menus and story choices.")) |> ignore
     controlsTable.AddRow(Markup("[bold white]Q [/] or [bold white]Escape[/]"), Markup("Tower Mode / Inspect"), Markup("Exit reticle inspection mode or retreat from tower expedition to menu.")) |> ignore
 
@@ -1230,11 +1340,12 @@ module Display =
     entityTable.AddColumn(TableColumn("[bold white]Interaction & Effect[/]")) |> ignore
 
     entityTable.AddRow(Markup("[bold #f1fa8c on #ff5555] @ [/]"), Markup("[bold #f1fa8c]Player Character[/]"), Markup("Your current location on the floor grid.")) |> ignore
+    entityTable.AddRow(Markup("[bold #bd93f9] ☠ [/]"), Markup("[bold #bd93f9]Floor Boss / Trauma Aspect[/]"), Markup("Guardian of the Ascension Portal. Defeating it restores full catharsis and unlocks the stairs.")) |> ignore
     entityTable.AddRow(Markup("[bold #ff5555] ! [/]"), Markup("[bold #ff5555]Hostile Guardian / Ambush[/]"), Markup("Formidable biome adversaries or lurking pack ambushes. Walk into tile to engage.")) |> ignore
     entityTable.AddRow(Markup("[#6272a4] % [/]"), Markup("[#6272a4]Neutralized Adversary[/]"), Markup("Defeated guardian or dispersed ambush site. Safely walkable.")) |> ignore
     entityTable.AddRow(Markup("[bold #8be9fd] ? [/]"), Markup("[bold #8be9fd]Inhabitant / Scholar[/]"), Markup("Friendly NPC offering dialogue, world lore, and optional ascension trials.")) |> ignore
     entityTable.AddRow(Markup("[bold #f1fa8c] ⌹ [/]"), Markup("[bold #f1fa8c]Vault Chest / Sealed Vault[/]"), Markup("Loot caches and puzzle-locked chambers. Recover keystones, Souls, and relics.")) |> ignore
-    entityTable.AddRow(Markup("[bold #50fa7b] † [/]"), Markup("[bold #50fa7b]Runic Shrine[/]"), Markup("Ancient monolith; communing restores +40 Morale and resets Recklessness to 0.")) |> ignore
+    entityTable.AddRow(Markup("[bold #50fa7b] † [/]"), Markup("[bold #50fa7b]Runic Shrine[/]"), Markup("Ancient monolith; restores Health, Morale, Armor, and weapon/mana integrity, vents strain, and identifies items.")) |> ignore
     entityTable.AddRow(Markup("[bold #bd93f9] ♨ [/]"), Markup("[bold #bd93f9]Sacrificial Altar[/]"), Markup("Dark stone offering permanent combat buffs in exchange for Health, Morale, or Armor.")) |> ignore
     entityTable.AddRow(Markup("[bold #8be9fd] $ [/]"), Markup("[bold #8be9fd]Spectral Merchant[/]"), Markup("Wandering trader exchanging rare equipment for Souls and alchemical trophies.")) |> ignore
     entityTable.AddRow(Markup("[bold #50fa7b] ✦ [/]"), Markup("[bold #50fa7b]Dormant Memory Echo[/]"), Markup("Sensory fragment of repressed trauma from the real world. Permanently deepens the Morale pool.")) |> ignore
@@ -1301,7 +1412,7 @@ module Display =
     let panel = createSymbolAndGlyphLegendPanel ()
     AnsiConsole.Clear()
     AnsiConsole.Write(panel)
-    Console.ReadKey(true) |> ignore
+    waitForKey ""
 
   [<Literal>]
   let HelpChoiceLabel = "󰋜  [bold #f1fa8c][[Help & Legend]][/] View Symbol & Glyph Guide (? / F1)"
@@ -1323,6 +1434,7 @@ module Display =
       let p =
         SelectionPrompt<string>()
           .Title(title)
+          .HighlightStyle(Theme.StylePromptHighlight)
           .AddChoices(fullChoices)
       match pageSize with
       | Some sz -> p.PageSize(sz) |> ignore

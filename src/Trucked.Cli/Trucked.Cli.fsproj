@@ -11,8 +11,8 @@
     <Compile Include="Types.fs" />
     <Compile Include="Archetypes.fs" />
     <Compile Include="Theme.fs" />
-    <Compile Include="EnvironmentScenes.fs" />
     <Compile Include="Display.fs" />
+    <Compile Include="EnvironmentScenes.fs" />
     <Compile Include="DeathAnimation.fs" />
     <Compile Include="Simulation.fs" />
     <Compile Include="TowerDisplay.fs" />

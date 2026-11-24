@@ -208,7 +208,7 @@ module EnvironmentScenes =
     grid.AddColumn(GridColumn().NoWrap()) |> ignore
 
     grid.AddRow(Markup(sprintf "[bold %s]Manifestation:[/] [bold %s]%s[/]" scene.HeaderColor Theme.Foreground (Markup.Escape boss.Name))) |> ignore
-    grid.AddRow(Markup(sprintf "[bold %s]Stance:[/] [bold %s]%A[/]" scene.HeaderColor scene.AccentColor boss.Stance)) |> ignore
+    grid.AddRow(Markup(sprintf "[bold %s]Stance:[/] [bold %s]%s[/]" scene.HeaderColor scene.AccentColor (Display.stanceDisplayName boss.Stance))) |> ignore
     grid.AddRow(Markup(sprintf "[bold %s]HP:[/] [bold red]%d/%d[/]   [bold %s]Morale:[/] [bold cyan]%d/%d[/]   [bold %s]Armor:[/] [bold yellow]%d[/]"
       scene.HeaderColor boss.Health.Current boss.Health.Maximum
       scene.HeaderColor boss.Morale.Current boss.Morale.Maximum
@@ -226,67 +226,72 @@ module EnvironmentScenes =
       .Border(BoxBorder.Rounded)
       .BorderStyle(Style(foreground = Nullable scene.BorderColor))
 
-  /// Plays the atmospheric animated transition from the White Meadow into the Crosswalk & Tower
+  /// Plays the atmospheric animated transition from the White Meadow into the Crosswalk & Tower.
+  /// Tapping any key fast-forwards the pacing pauses while keeping the final reveal legible.
   let playCrosswalkTowerTransition () =
     AnsiConsole.Clear()
     AnsiConsole.Cursor.Hide()
 
-    let consoleWidth = Math.Max(70, AnsiConsole.Profile.Width)
+    try
+      let consoleWidth = Math.Max(70, AnsiConsole.Profile.Width)
+      let mutable skipped = false
 
-    // Phase 1: Dissolving the meadow of white lilies into rain and asphalt
-    AnsiConsole.MarkupLine("[bold gold1]The radiant white meadow shimmers under the calm summer sun...[/]")
-    Thread.Sleep(700)
-    AnsiConsole.MarkupLine("[grey]A sudden chill runs through the air. The scent of lilies sharpens into gasoline and wet asphalt.[/]")
-    Thread.Sleep(800)
-    AnsiConsole.MarkupLine("[bold yellow]A low, vibrating hum rises from all sides—the drone of dozens of idling engines.[/]\n")
-    Thread.Sleep(1000)
+      // Phase 1: Dissolving the meadow of white lilies into rain and asphalt
+      AnsiConsole.MarkupLine("[bold gold1]The radiant white meadow shimmers under the calm summer sun...[/]")
+      if Display.sleepSkippable 700 then skipped <- true
+      AnsiConsole.MarkupLine("[grey]A sudden chill runs through the air. The scent of lilies sharpens into gasoline and wet asphalt.[/]")
+      if not skipped && Display.sleepSkippable 800 then skipped <- true
+      AnsiConsole.MarkupLine("[bold yellow]A low, vibrating hum rises from all sides—the drone of dozens of idling engines.[/]\n")
+      if not skipped && Display.sleepSkippable 1000 then skipped <- true
 
-    // Phase 2: High beam flash animation across the terminal grid
-    AnsiConsole.Live(Panel(Text("")))
-      .AutoClear(false)
-      .Overflow(VerticalOverflow.Crop)
-      .Start(fun ctx ->
-        let cars = [|
-          @"[CAR]  ════════════════════▶   |  |   ◀════════════════════  [CAR]"
-          @" [RED LIGHT]                 |  |                 [RED LIGHT] "
-          @"                              |  |                              "
-          @"             [===== MONOLITHIC BRONZE PORTAL =====]             "
-          @"                    [ THE TOWER ENTRANCE ]                      "
-        |]
+      // Phase 2: High beam flash animation across the terminal grid
+      AnsiConsole.Live(Panel(Text("")))
+        .AutoClear(false)
+        .Overflow(VerticalOverflow.Crop)
+        .Start(fun ctx ->
+          let cars = [|
+            @"[CAR]  ════════════════════▶   |  |   ◀════════════════════  [CAR]"
+            @" [RED LIGHT]                 |  |                 [RED LIGHT] "
+            @"                              |  |                              "
+            @"             [===== MONOLITHIC BRONZE PORTAL =====]             "
+            @"                    [ THE TOWER ENTRANCE ]                      "
+          |]
 
-        for step in 1..4 do
-          let grid = Grid()
-          grid.AddColumn(GridColumn().NoWrap()) |> ignore
+          for step in 1..4 do
+            if not skipped || step = 4 then
+              let grid = Grid()
+              grid.AddColumn(GridColumn().NoWrap()) |> ignore
 
-          for _ in 1..2 do
-            grid.AddRow(Text("")) |> ignore
+              for _ in 1..2 do
+                grid.AddRow(Text("")) |> ignore
 
-          let beamColor = if step % 2 = 0 then "bold yellow on black" else "bold white on yellow3"
-          let row0 = sprintf "[%s]%s[/]" beamColor (Markup.Escape cars.[0])
-          let row1 = sprintf "[bold red]%s[/]" (Markup.Escape cars.[1])
-          let row2 = sprintf "[grey]%s[/]" (Markup.Escape cars.[2])
-          let row3 = sprintf "[bold cyan]%s[/]" (Markup.Escape cars.[3])
-          let row4 = sprintf "[bold gold1]%s[/]" (Markup.Escape cars.[4])
+              let beamColor = if step % 2 = 0 then "bold yellow on black" else "bold white on yellow3"
+              let row0 = sprintf "[%s]%s[/]" beamColor (Markup.Escape cars.[0])
+              let row1 = sprintf "[bold red]%s[/]" (Markup.Escape cars.[1])
+              let row2 = sprintf "[grey]%s[/]" (Markup.Escape cars.[2])
+              let row3 = sprintf "[bold cyan]%s[/]" (Markup.Escape cars.[3])
+              let row4 = sprintf "[bold gold1]%s[/]" (Markup.Escape cars.[4])
 
-          grid.AddRow(Markup(row0)) |> ignore
-          grid.AddRow(Markup(row1)) |> ignore
-          grid.AddRow(Markup(row2)) |> ignore
-          grid.AddRow(Markup(row3)) |> ignore
-          grid.AddRow(Markup(row4)) |> ignore
-          grid.AddRow(Markup(sprintf "[grey]%s[/]" (String('=', Math.Min(consoleWidth, 75))))) |> ignore
+              grid.AddRow(Markup(row0)) |> ignore
+              grid.AddRow(Markup(row1)) |> ignore
+              grid.AddRow(Markup(row2)) |> ignore
+              grid.AddRow(Markup(row3)) |> ignore
+              grid.AddRow(Markup(row4)) |> ignore
+              grid.AddRow(Markup(sprintf "[grey]%s[/]" (String('=', Math.Min(consoleWidth, 75))))) |> ignore
 
-          ctx.UpdateTarget(
-            Panel(grid)
-              .Header("[bold yellow] THE CROSSWALK AT THE INTERSECTION [/]")
-              .Border(BoxBorder.Double)
-              .BorderStyle(Style(foreground = Nullable Color.Yellow))
-          )
-          Thread.Sleep(300)
-      )
+              ctx.UpdateTarget(
+                Panel(grid)
+                  .Header("[bold yellow] THE CROSSWALK AT THE INTERSECTION [/]")
+                  .Border(BoxBorder.Double)
+                  .BorderStyle(Style(foreground = Nullable Color.Yellow))
+              )
+              if not skipped && Display.sleepSkippable 300 then skipped <- true
+        )
 
-    Thread.Sleep(500)
-    AnsiConsole.MarkupLine("\n[bold white]Bumper-to-bumper cars block any retreat to the left or right.[/]")
-    AnsiConsole.MarkupLine("[bold green]The pedestrian signal clicks white. The path leads forward across the street.[/]")
-    AnsiConsole.MarkupLine("[bold cyan]You place your hands against the colossal bronze gates of The Tower...[/]\n")
-    Thread.Sleep(1000)
-    AnsiConsole.Cursor.Show()
+      if not skipped && Display.sleepSkippable 500 then skipped <- true
+      AnsiConsole.MarkupLine("\n[bold white]Bumper-to-bumper cars block any retreat to the left or right.[/]")
+      AnsiConsole.MarkupLine("[bold green]The pedestrian signal clicks white. The path leads forward across the street.[/]")
+      AnsiConsole.MarkupLine("[bold cyan]You place your hands against the colossal bronze gates of The Tower...[/]\n")
+      if not skipped then Display.sleepSkippable 1000 |> ignore
+    finally
+      AnsiConsole.Cursor.Show()

@@ -29,6 +29,7 @@
     <Compile Include="DebugToolingTests.fs" />
     <Compile Include="CombatTacticsTests.fs" />
     <Compile Include="WindupReadabilityTests.fs" />
+    <Compile Include="UiFeelTests.fs" />
     <Compile Include="DifficultyTelemetryTests.fs" />
   </ItemGroup>
 

@@ -12,8 +12,6 @@ open Trucked.Story
 
 module TowerDisplay =
 
-  /// Outcome of a multi-enemy (group) engagement
-  [<RequireQualifiedAccess>]
   /// The honest cause of a defeat for the rewind log: collapse first (a run can end with full
   /// pools), then the pool that emptied. Round-by-round combat never reaches the message log,
   /// so this line is the only record of how the run ended.
@@ -33,6 +31,8 @@ module TowerDisplay =
     | CollapseState.Stable when c.Morale.IsDepleted -> sprintf "were demoralized by %s" foe
     | CollapseState.Stable -> sprintf "were overwhelmed by %s" foe
 
+  /// Outcome of a multi-enemy (group) engagement
+  [<RequireQualifiedAccess>]
   type GroupDuelOutcome =
     | Victorious
     | Defeated
@@ -574,12 +574,7 @@ module TowerDisplay =
     row (sprintf "[bold %s]─── 󰓥 TACTICAL VITALS ───[/]" Theme.Yellow) |> ignore
     row (Display.renderBar "󰋑 Health" p.Health.Current p.Health.Maximum Theme.Red) |> ignore
     row (Display.renderBar "󰧑 Morale" p.Morale.Current p.Morale.Maximum Theme.Cyan) |> ignore
-    let armorText =
-      if p.Armor.IsShredded && p.Armor.Boost <= 0 then
-        sprintf "%-10s [bold blink %s]SHREDDED (0%% soak) ⚠[/]" " Armor" Theme.Red
-      else
-        sprintf "%-10s [%s]%4d[/][%s]/[/]%4d [%s](%d%% soak)[/]" " Armor" Theme.Comment p.Armor.Current Theme.Comment p.Armor.Max Theme.Yellow (int (p.Armor.AbsorptionRatio * 100.0))
-    row (armorText) |> ignore
+    row (Display.renderArmorRow " Armor" p.Armor) |> ignore
 
     // Initiative: the single fact that decides whether the next blow lands first.
     row (sprintf "%-22s %s" "󰒋 Initiative" (Display.tempoBadge p)) |> ignore
@@ -590,7 +585,7 @@ module TowerDisplay =
     elif p.Health.Current <= p.Health.Maximum / 2 then
       row ("[bold yellow]⚠ WOUNDED: Health below 50%. Triage or rest recommended.[/]") |> ignore
 
-    // Stance, Complex Form, and Weapon Integrity
+    // Stance, Complex Form, and Weapon / Mana Integrity
     if p.Plane = Mental then
       let formColor, formName =
         match p.ComplexForm with
@@ -605,10 +600,10 @@ module TowerDisplay =
         | CombatStance.PowerStance -> Theme.Red
         | CombatStance.AgilityStance -> Theme.Green
         | CombatStance.DisciplineStance -> Theme.Purple
-      row (sprintf "%-22s [bold %s]%A[/]" "󰓥 Combat Stance" stanceColor p.Stance) |> ignore
+      row (sprintf "%-22s [bold %s]%s[/]" "󰓥 Combat Stance" stanceColor (Display.stanceDisplayName p.Stance)) |> ignore
 
-      let integrityLabel, weaponCondColor, weaponCondDesc = Display.integrityReadout p
-      row (sprintf "%-22s [bold %s]%s[/]" integrityLabel weaponCondColor weaponCondDesc) |> ignore
+    let integrityLabel, weaponCondColor, weaponCondDesc = Display.integrityReadout p
+    row (sprintf "%-22s [bold %s]%s[/]" integrityLabel weaponCondColor weaponCondDesc) |> ignore
 
     // Physical & Emotional Strain Meters
     row (Display.renderMeter "󰈸 Recklessness" p.Meters.Recklessness Theme.Orange) |> ignore
@@ -777,7 +772,11 @@ module TowerDisplay =
 
     let logText =
       recent
-      |> List.map (fun msg -> sprintf "[%s]󰁔[/] [bold %s]%s[/]" Theme.Pink Theme.Foreground (Markup.Escape msg))
+      |> List.mapi (fun i msg ->
+        if i = 0 then
+          sprintf "[bold %s]▸[/] [bold %s]%s[/]" Theme.Pink Theme.Foreground (Markup.Escape msg)
+        else
+          sprintf "[%s]·[/] [grey]%s[/]" Theme.Comment (Markup.Escape msg))
       |> String.concat "\n"
 
     Panel(Markup(Display.stripNerdGlyphs logText))
@@ -876,11 +875,11 @@ module TowerDisplay =
     let grid = Grid()
     grid.AddColumn(GridColumn()) |> ignore
 
-    grid.AddRow(Markup(sprintf "[bold %s]%s[/] [italic %s](%s)[/]" Theme.Cyan npc.Name Theme.Comment npc.Role)) |> ignore
+    grid.AddRow(Markup(sprintf "[bold %s]%s[/] [italic %s](%s)[/]" Theme.Cyan (Markup.Escape npc.Name) Theme.Comment (Markup.Escape npc.Role))) |> ignore
     grid.AddRow(Rule().RuleStyle(Theme.StyleComment)) |> ignore
 
     for line in npc.Dialogue do
-      grid.AddRow(Markup(sprintf "[%s]\"%s\"[/]\n" Theme.Foreground line)) |> ignore
+      grid.AddRow(Markup(sprintf "[%s]\"%s\"[/]\n" Theme.Foreground (Markup.Escape line))) |> ignore
 
     match npc.Quest with
     | Some q ->
@@ -888,9 +887,9 @@ module TowerDisplay =
         if q.IsCompleted then "TRIAL FULFILLED", "Reward granted:"
         else "TRIAL OFFERED", "Reward:"
       grid.AddRow(Rule(sprintf "[bold %s]%s[/]" Theme.Yellow header).RuleStyle(Theme.StyleYellow)) |> ignore
-      grid.AddRow(Markup(sprintf "[bold %s]%s[/]" Theme.Yellow q.Title)) |> ignore
-      grid.AddRow(Markup(sprintf "[%s]%s[/]" Theme.Foreground q.Description)) |> ignore
-      grid.AddRow(Markup(sprintf "[bold %s]%s[/] [italic %s]%s[/]" Theme.Green rewardLead Theme.Foreground q.RewardDescription)) |> ignore
+      grid.AddRow(Markup(sprintf "[bold %s]%s[/]" Theme.Yellow (Markup.Escape q.Title))) |> ignore
+      grid.AddRow(Markup(sprintf "[%s]%s[/]" Theme.Foreground (Markup.Escape q.Description))) |> ignore
+      grid.AddRow(Markup(sprintf "[bold %s]%s[/] [italic %s]%s[/]" Theme.Green rewardLead Theme.Foreground (Markup.Escape q.RewardDescription))) |> ignore
     | None -> ()
 
     grid.AddRow(Markup(sprintf "\n[%s]Press any key to close dialogue...[/]" Theme.Comment)) |> ignore
@@ -902,7 +901,7 @@ module TowerDisplay =
 
     AnsiConsole.Clear()
     AnsiConsole.Write(panel)
-    Console.ReadKey(true) |> ignore
+    Display.waitForKey ""
 
   /// Confirms a finished trial. Without this the quest resolved silently: the only trace was a line
   /// in a message log the modal dialogue had just cleared off the screen. The reward text comes from
@@ -913,8 +912,8 @@ module TowerDisplay =
 
     grid.AddRow(Markup(sprintf "[bold %s]󰄬 QUEST COMPLETE[/]" Theme.Green)) |> ignore
     grid.AddRow(Rule().RuleStyle(Theme.StyleGreen)) |> ignore
-    grid.AddRow(Markup(sprintf "[bold %s]%s[/]" Theme.Yellow quest.Title)) |> ignore
-    grid.AddRow(Markup(sprintf "[bold %s]Reward:[/] [italic %s]%s[/]\n" Theme.Green Theme.Foreground quest.RewardDescription)) |> ignore
+    grid.AddRow(Markup(sprintf "[bold %s]%s[/]" Theme.Yellow (Markup.Escape quest.Title))) |> ignore
+    grid.AddRow(Markup(sprintf "[bold %s]Reward:[/] [italic %s]%s[/]\n" Theme.Green Theme.Foreground (Markup.Escape quest.RewardDescription))) |> ignore
     grid.AddRow(Markup(sprintf "[bold %s]The Ascension Portal is unlocked.[/]" Theme.Purple)) |> ignore
     grid.AddRow(Markup(sprintf "\n[%s]Press any key to continue...[/]" Theme.Comment)) |> ignore
 
@@ -925,20 +924,20 @@ module TowerDisplay =
 
     AnsiConsole.Clear()
     AnsiConsole.Write(panel)
-    Console.ReadKey(true) |> ignore
+    Display.waitForKey ""
 
   /// Displays an evocative narrative modal when discovering a roadside memory fragment
   let showMemoryEchoDialog (echo: MemoryEchoData) =
     let grid = Grid()
     grid.AddColumn(GridColumn()) |> ignore
 
-    grid.AddRow(Markup(sprintf "[bold %s]✧ AWAKENED REPRESSED MEMORY: %s[/]" Theme.Pink echo.Title)) |> ignore
+    grid.AddRow(Markup(sprintf "[bold %s]✧ AWAKENED REPRESSED MEMORY: %s[/]" Theme.Pink (Markup.Escape echo.Title))) |> ignore
     grid.AddRow(Rule().RuleStyle(Theme.StylePurple)) |> ignore
 
-    grid.AddRow(Markup(sprintf "[italic %s]\"%s\"[/]\n" Theme.Cyan echo.SensoryDetail)) |> ignore
+    grid.AddRow(Markup(sprintf "[italic %s]\"%s\"[/]\n" Theme.Cyan (Markup.Escape echo.SensoryDetail))) |> ignore
 
     for line in echo.MemoryTranscript do
-      grid.AddRow(Markup(sprintf "[%s]%s[/]" Theme.Foreground line)) |> ignore
+      grid.AddRow(Markup(sprintf "[%s]%s[/]" Theme.Foreground (Markup.Escape line))) |> ignore
 
     grid.AddRow(Rule().RuleStyle(Theme.StyleComment)) |> ignore
     grid.AddRow(Markup(sprintf "[bold %s]󰄬 Resolve deepened for good: +%d%% Morale pool, restored in full[/]" Theme.Green echo.MoraleGrowth)) |> ignore
@@ -951,7 +950,7 @@ module TowerDisplay =
 
     AnsiConsole.Clear()
     AnsiConsole.Write(panel)
-    Console.ReadKey(true) |> ignore
+    Display.waitForKey ""
 
   /// Shows the comprehensive symbol, glyph, and control manual
   let showHelpManual () =
@@ -966,16 +965,17 @@ module TowerDisplay =
 
     let tier = ProgressionScale.levelToTier p.Level
 
-    grid.AddRow(Markup(sprintf "[bold %s]%s[/]  [grey](%s • Level %d)[/]" Theme.Yellow p.Name p.Class.Name p.Level)) |> ignore
+    let xpBar = Display.renderMiniBar p.Progression.CurrentXP p.Progression.ExperienceToNext 10 Theme.Green
+    grid.AddRow(Markup(sprintf "[bold %s]%s[/]  [grey](%s • Level %d)[/]" Theme.Yellow (Markup.Escape p.Name) p.Class.Name p.Level)) |> ignore
     grid.AddRow(Markup(sprintf "Mastery Tier: [bold %s]%s[/]    Plane: [bold %s]%s[/]" Theme.Cyan (tier.ToString()) Theme.Purple (p.Plane.ToString()))) |> ignore
-    grid.AddRow(Markup(sprintf "Experience: [bold %s]%d / %d[/] toward Level %d" Theme.Green p.Progression.CurrentXP p.Progression.ExperienceToNext (p.Level + 1))) |> ignore
+    grid.AddRow(Markup(sprintf "Experience: %s [bold %s]%d / %d[/] toward Level %d" xpBar Theme.Green p.Progression.CurrentXP p.Progression.ExperienceToNext (p.Level + 1))) |> ignore
     grid.AddRow(Markup(sprintf "[grey]Attributes are stance-adjusted: +25%% matching vector, -25%% off-vector offense.[/]")) |> ignore
     grid.AddRow(Rule().RuleStyle(Theme.StyleComment)) |> ignore
 
     grid.AddRow(Markup(sprintf "[bold %s]─── 󰓥 VITALS ───[/]" Theme.Yellow)) |> ignore
     grid.AddRow(Markup(Display.renderBar "󰋑 Health" p.Health.Current p.Health.Maximum Theme.Red)) |> ignore
     grid.AddRow(Markup(Display.renderBar "󰧑 Morale" p.Morale.Current p.Morale.Maximum Theme.Cyan)) |> ignore
-    grid.AddRow(Markup(sprintf "%-10s [%s]%4d[/][%s]/[/]%4d [%s](%d%% soak)[/]" " Armor" Theme.Comment p.Armor.Current Theme.Comment p.Armor.Max Theme.Yellow (int (p.Armor.AbsorptionRatio * 100.0)))) |> ignore
+    grid.AddRow(Markup(Display.renderArmorRow " Armor" p.Armor)) |> ignore
 
     let renderPlane (plane: Plane) (planeColor: string) =
       grid.AddRow(Markup(sprintf "[bold %s]─── %s PLANE ───[/]" planeColor (plane.ToString().ToUpperInvariant()))) |> ignore
@@ -1003,13 +1003,13 @@ module TowerDisplay =
       let formName = p.ComplexForm |> Option.map (fun f -> f.Name) |> Option.defaultValue "Unthreaded"
       grid.AddRow(Markup(sprintf "Complex Form: [bold %s]%s[/]" Theme.Pink formName)) |> ignore
     else
-      grid.AddRow(Markup(sprintf "Combat Stance: [bold %s]%A[/]" Theme.Green p.Stance)) |> ignore
+      grid.AddRow(Markup(sprintf "Combat Stance: [bold %s]%s[/]" Theme.Green (Display.stanceDisplayName p.Stance))) |> ignore
 
     if not p.Preparations.IsEmpty then
       grid.AddRow(Markup(sprintf "[bold %s]─── TACTICAL PREPARATIONS ───[/]" Theme.Cyan)) |> ignore
 
       for slot in p.Preparations do
-        grid.AddRow(Markup(sprintf "• [bold white]%A[/]  [grey]%d / %d uses[/]" slot.Type slot.RemainingUses slot.MaxUses)) |> ignore
+        grid.AddRow(Markup(sprintf "• [bold white]%s[/]  [grey]%d / %d uses[/]" (Markup.Escape slot.Type.Name) slot.RemainingUses slot.MaxUses)) |> ignore
 
     Panel(grid)
       .Header(Display.stripNerdGlyphs (sprintf "[bold %s]󰒋 CHARACTER SHEET[/]" Theme.Cyan))
@@ -1022,8 +1022,7 @@ module TowerDisplay =
     AnsiConsole.Clear()
     AnsiConsole.Write(renderCharacterSheet state)
     AnsiConsole.WriteLine()
-    AnsiConsole.MarkupLine(sprintf "[%s]Press any key to return to the chamber...[/]" Theme.Comment)
-    Console.ReadKey(true) |> ignore
+    Display.waitForKey (sprintf "[%s]Press any key to return to the chamber...[/]" Theme.Comment)
 
   /// Opens the inventory panel. Read-only apart from the use key: it returns the kind the player
   /// chose so the caller stays the only place that mutates session state.
@@ -1129,8 +1128,7 @@ module TowerDisplay =
       AnsiConsole.Clear()
       AnsiConsole.Write(Align.Center(panel))
       AnsiConsole.WriteLine()
-      AnsiConsole.MarkupLine(sprintf "[%s]Press any key to continue...[/]" Theme.Comment)
-      Console.ReadKey(true) |> ignore
+      Display.waitForKey (sprintf "[%s]Press any key to continue...[/]" Theme.Comment)
 
   /// Main interactive turn loop for Tower dungeon crawling and Story Mode stage exploration
   let runTowerCrawlWithMode
@@ -1227,7 +1225,7 @@ module TowerDisplay =
                   :: state.MessageLog }
           state <- TowerSession.updateFov state
           AnsiConsole.MarkupLine(sprintf "\n[bold red]Trauma loop reset! Rewound to entrance. Health restored, progression preserved. Grind and prepare![/]")
-          Thread.Sleep(1200)
+          Display.sleepSkippable 1200 |> ignore
 
         | GroupDuelOutcome.Fled ->
           // Break away to the free neighbouring tile furthest from the pack.
@@ -1680,7 +1678,7 @@ module TowerDisplay =
                     match recklessLabelOpt with
                     | Some label -> AnsiConsole.MarkupLine(sprintf "[bold %s]%s[/]" Theme.Yellow label)
                     | None -> ()
-                    Thread.Sleep(900)
+                    Display.sleepSkippable 900 |> ignore
 
                   state <- TowerSession.resolveEnemyDefeat enemy.Id state
                   showLevelUpBanner state levelBefore
@@ -1754,8 +1752,8 @@ module TowerDisplay =
                           sprintf "⚡ Quick Resolved %s (Level %d) in %d round(s) (-%d HP, -%d Morale)."
                             enemy.Name enemy.Combatant.Level rounds hpLost moraleLost
                           :: state.MessageLog }
-                  AnsiConsole.MarkupLine(sprintf "\n[bold %s]⚡ Quick Resolve Victory! Vanquished %s in %d round(s) (-%d HP, -%d Morale, +XP).[/]" Theme.Green enemy.Name rounds hpLost moraleLost)
-                  Thread.Sleep(700)
+                  AnsiConsole.MarkupLine(sprintf "\n[bold %s]⚡ Quick Resolve Victory! Vanquished %s in %d round(s) (-%d HP, -%d Morale, +XP).[/]" Theme.Green (Markup.Escape enemy.Name) rounds hpLost moraleLost)
+                  Display.sleepSkippable 700 |> ignore
                   showLevelUpBanner state levelBefore
 
               else
@@ -1799,17 +1797,17 @@ module TowerDisplay =
                           sprintf "Withdrew from %s (Level %d) — it struck as you turned (-%d HP)."
                             enemy.Name enemy.Combatant.Level hpLost
                           :: state.MessageLog }
-                  AnsiConsole.MarkupLine(sprintf "\n[bold %s]You step back from %s — the parting blow costs %d HP.[/]" Theme.Yellow enemy.Name hpLost)
-                  Thread.Sleep(600)
+                  AnsiConsole.MarkupLine(sprintf "\n[bold %s]You step back from %s — the parting blow costs %d HP.[/]" Theme.Yellow (Markup.Escape enemy.Name) hpLost)
+                  Display.sleepSkippable 600 |> ignore
 
             | TowerEvent.ChestOpened(chest, itemOpt, _) ->
               AnsiConsole.WriteLine()
               let rewardText =
                 match itemOpt with
-                | Some item -> sprintf "[bold %s]Relic Discovered:[/] %s\n[italic grey]%s[/]" Theme.Yellow item.Name item.Description
+                | Some item -> sprintf "[bold %s]Relic Discovered:[/] %s\n[italic grey]%s[/]" Theme.Yellow (Markup.Escape item.Name) (Markup.Escape item.Description)
                 | None -> "The chest mechanisms yield."
-              AnsiConsole.MarkupLine(sprintf "\n[bold %s]⌹ %s[/]\n%s" Theme.Yellow chest.Description rewardText)
-              Thread.Sleep(900)
+              AnsiConsole.MarkupLine(sprintf "\n[bold %s]⌹ %s[/]\n%s" Theme.Yellow (Markup.Escape chest.Description) rewardText)
+              Display.sleepSkippable 900 |> ignore
 
             | TowerEvent.NpcInteracted(npc, questCompleted) ->
               // The engine already chronicles the conversation itself (and quotes the dialogue).
@@ -1988,18 +1986,18 @@ module TowerDisplay =
                 AnsiConsole.Clear()
                 AnsiConsole.Write(EnvironmentScenes.renderSceneHeader nextScene)
                 AnsiConsole.WriteLine()
-                AnsiConsole.MarkupLine(sprintf "[bold %s]Ascended to %s! Stepping into the new stage...[/]" Theme.Yellow nextScene.LocationName)
-                Thread.Sleep(1500)
+                AnsiConsole.MarkupLine(sprintf "[bold %s]Ascended to %s! Stepping into the new stage...[/]" Theme.Yellow (Markup.Escape nextScene.LocationName))
+                Display.sleepSkippable 1500 |> ignore
               else
                 AnsiConsole.Clear()
                 AnsiConsole.Write(
-                  Rule(sprintf "[bold %s]★★★ ASCENDED TO FLOOR %d: %s ★★★[/]" Theme.Yellow nextFloorNum state.CurrentFloor.Theme.Name)
+                  Rule(sprintf "[bold %s]★★★ ASCENDED TO FLOOR %d: %s ★★★[/]" Theme.Yellow nextFloorNum (Markup.Escape state.CurrentFloor.Theme.Name))
                     .Centered()
                     .RuleStyle(Theme.StyleYellow)
                 )
-                AnsiConsole.MarkupLine(sprintf "\n[bold %s]%s[/]" Theme.Foreground state.CurrentFloor.Theme.Description)
+                AnsiConsole.MarkupLine(sprintf "\n[bold %s]%s[/]" Theme.Foreground (Markup.Escape state.CurrentFloor.Theme.Description))
                 AnsiConsole.MarkupLine(sprintf "[%s]Stepping into the vast new chamber...[/]" Theme.Comment)
-                Thread.Sleep(1200)
+                Display.sleepSkippable 1200 |> ignore
 
             | _ -> ()
 

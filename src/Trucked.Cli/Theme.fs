@@ -49,3 +49,7 @@ module Theme =
   let StyleRed = Style(foreground = Nullable ColorRed)
   let StyleComment = Style(foreground = Nullable ColorComment)
   let StyleYellow = Style(foreground = Nullable ColorYellow)
+  let StyleCyan = Style(foreground = Nullable ColorCyan)
+  let StyleOrange = Style(foreground = Nullable ColorOrange)
+  let StylePink = Style(foreground = Nullable ColorPink)
+  let StylePromptHighlight = Style(foreground = Nullable ColorYellow, decoration = Decoration.Bold)
