@@ -33,17 +33,20 @@ let ``a DisciplineStance defender is estimated against its real Poise guard`` ()
   Assert.Equal(0.0, AttackEstimator.estimate weak discipline prowl)
 
 [<Fact>]
-let ``a strike is estimated in the stance it transitions into, not the one held`` () =
+let ``a strike is estimated in the held stance, since fluid transition happens post-swing`` () =
   let power = TierFactory.createClassLevel CharacterClass.Fighter 100 // holds PowerStance
   let target = TierFactory.createClassLevel CharacterClass.Warrior 100
   let agility = { power with Stance = CombatStance.AgilityStance }
   let discipline = { power with Stance = CombatStance.DisciplineStance }
 
-  // FinesseCadence always transitions to AgilityStance, so the held stance must not matter.
+  // Fluid stance transitions run after the contest resolves, so holding AgilityStance estimates
+  // higher for FinesseCadence (+25%) than striking off-stance from PowerStance or DisciplineStance (0.75x).
   let finesse = AttackClassification.FinesseCadence false
   let fromPower = AttackEstimator.estimate power target finesse
-  Assert.Equal(fromPower, AttackEstimator.estimate agility target finesse)
-  Assert.Equal(fromPower, AttackEstimator.estimate discipline target finesse)
+  let fromAgility = AttackEstimator.estimate agility target finesse
+  let fromDiscipline = AttackEstimator.estimate discipline target finesse
+  Assert.True(fromAgility > fromPower, sprintf "AgilityStance (%.2f) must out-estimate PowerStance (%.2f) for FinesseCadence" fromAgility fromPower)
+  Assert.Equal(fromPower, fromDiscipline)
 
 [<Fact>]
 let ``each strike scales with its own meter`` () =

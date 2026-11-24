@@ -23,14 +23,16 @@ let ``Physical sub-classes follow exact 1.0 to 0.75 to 0.75 stat ratios`` () =
   Assert.Equal(631, rogue.GetStat Force)
 
 [<Fact>]
-let ``Mage mental stats grow at the full 1.0 ratio on all three mental axes`` () =
+let ``Mage mental stats grow around the 1.0 primary with budget-neutral ±5% vector asymmetry`` () =
   let level = 200 // GrandMaster tier
 
-  // The Mage is the only arcane class left and normalizes Intellect, Acuity and Prowess at the primary 1.0 ratio
+  // The Mage normalizes around primary 841 with budget-neutral ±5% vector tilt:
+  // Intellect +5% (883), Acuity -5% (799), Prowess at baseline primary (841).
   let mage = TierFactory.createClassLevel CharacterClass.Mage level
-  Assert.Equal(841, mage.GetStat Intellect)
-  Assert.Equal(841, mage.GetStat Acuity)
+  Assert.Equal(883, mage.GetStat Intellect)
+  Assert.Equal(799, mage.GetStat Acuity)
   Assert.Equal(841, mage.GetStat Prowess)
+  Assert.Equal(2 * mage.GetStat Prowess, mage.GetStat Intellect + mage.GetStat Acuity)
 
 [<Fact>]
 let ``Mage active Phantasmal Decoy Swap defuses incoming kinetic strike in the Nach`` () =
@@ -358,7 +360,8 @@ let ``Resonance Spike boosts arcane spell damage and inflicts Fading drain and e
   Assert.Equal(10, fatDrain)
   Assert.Equal(15, reckSpike)
   Assert.True(result.Actor.Meters.CognitiveFatigue.Value >= 10, "Caster must suffer fatigue from Fading drain.")
-  Assert.True(result.Actor.Meters.Recklessness.Value >= 15, "Caster must suffer recklessness from Fading drain.")
+  // Landing a clean non-gambit hit vents 12 Recklessness, so net Recklessness after +15 Fading drain is >= 3.
+  Assert.True(result.Actor.Meters.Recklessness.Value >= 3, "Caster must retain net recklessness after Fading drain (+15) and clean-hit vent (-12).")
 
   // Verify extra cognitive fatigue inflicted on target
   Assert.True(result.Target.Meters.CognitiveFatigue.Value >= 20, "Target must suffer extra cognitive fatigue from Resonance Spike.")
@@ -537,7 +540,8 @@ let ``Mage and Fighter mirror each other to level 50, then the planes diverge`` 
       if own <> Fortitude && own <> Reflex then
         Assert.Equal(mage.GetStat own, fighter.GetStat off)
 
-    let share = int (Math.Round(float (mage.GetStat Intellect) * (ProgressionScale.spellArmorBonus level)))
+    let prim, _, _, _, _, _ = ProgressionScale.physicalStatsForLevel level
+    let share = int (Math.Round(float prim * (ProgressionScale.spellArmorBonus level)))
 
     // Fortitude mirrors the Fighter's Resolve and Reflex its Intuition; the Mage carries the spell-armour
     // share on top of that mirrored base.
@@ -569,6 +573,8 @@ let ``Mage and Fighter mirror each other to level 50, then the planes diverge`` 
   Assert.True(mageOwn > mageOff, sprintf "mage mental %d must outgrow physical %d" mageOwn mageOff)
 
   // "Average stats before Master": both classes arrive at level 100 with their own plane on the same
-  // primary tier, so advancing to Master is a tier change rather than one class arriving undercooked.
-  Assert.Equal(441, fighter100.GetStat Force)
-  Assert.Equal(441, mage100.GetStat Intellect)
+  // primary tier (441 baseline Prowess, 463 Power-tilted Force/Intellect).
+  Assert.Equal(463, fighter100.GetStat Force)
+  Assert.Equal(463, mage100.GetStat Intellect)
+  Assert.Equal(441, fighter100.GetStat Prowess)
+  Assert.Equal(441, mage100.GetStat Prowess)

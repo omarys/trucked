@@ -36,10 +36,11 @@ module TacticalAssessmentTests =
 
     let assess = TacticalAssessment.assess player gargoyle
 
-    // The staff sharpens Intellect to 70; 70 + Intuition 60/4 (15) = 85 vs Resolve 160 (Ratio ~0.53)
+    // The staff sharpens Intellect (47 power-tilted -> 73) and robes lift Intuition (43 agility-tilted -> 57);
+    // 73 + 57/4 (14) = 87 vs Resolve 160 (Ratio ~0.54)
     Assert.Equal(TacticalInsightLevel.Discerning, assess.InsightLevel)
     Assert.Equal("DISCERNING READ", assess.Headline)
-    Assert.Equal(70 + 60 / 4, assess.EffectiveAcumen)
+    Assert.Equal(73 + 57 / 4, assess.EffectiveAcumen)
     Assert.True(assess.VulnerabilitySummary.IsSome)
     Assert.Equal(StatId.Reflex, assess.PrimaryStat)
     Assert.Equal(240, assess.PrimaryStatValue)

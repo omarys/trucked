@@ -234,14 +234,13 @@ module StorySpatialTests =
       Assert.Equal(1, player.Level)
 
     // Starting weapon and caltrops bonuses are real, folded into the base stats at creation. They are
-    // percentages of the stat they land on (the number in brackets is what they were as flat points
-    // on the level-1 scale), so they keep mattering as attributes grow. Both planes share one level-1
-    // primary of 45 now, so a caster's Intellect starts where a fighter's Force does.
-    Assert.Equal(65, fighter.Stats.Get StatId.Force) // 45 + sword 44% (+20)
-    Assert.Equal(65, fighter.Stats.Get StatId.Fortitude) // 45 + shield 44% (+20)
-    Assert.Equal(73, fighter.Stats.Get StatId.Reflex) // 45 + shield 22% (+10) -> 55, then caltrops 33% (+18)
-    Assert.Equal(70, mage.Stats.Get StatId.Intellect) // 45 + staff 56% (+25)
-    Assert.Equal(65, mage.Stats.Get StatId.Resolve) // 45 + robes 44% (+20)
+    // percentages of the stat they land on, so they keep mattering as attributes grow. Both planes share
+    // one level-1 primary of 45 with budget-neutral ±5% vector tilt (Power pair 47, Agility pair 43).
+    Assert.Equal(68, fighter.Stats.Get StatId.Force) // 47 + sword 44% (+21)
+    Assert.Equal(68, fighter.Stats.Get StatId.Fortitude) // 47 + shield 44% (+21)
+    Assert.Equal(69, fighter.Stats.Get StatId.Reflex) // 43 + shield 22% (+9) -> 52, then caltrops 33% (+17)
+    Assert.Equal(73, mage.Stats.Get StatId.Intellect) // 47 + staff 56% (+26)
+    Assert.Equal(68, mage.Stats.Get StatId.Resolve) // 47 + robes 44% (+21)
 
   [<Fact>]
   let ``Stage 1 grinding mobs mix woodland creatures and bandits ahead of the Bandit Leader`` () =

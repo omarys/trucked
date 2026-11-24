@@ -546,17 +546,16 @@ let ``every Grief Aspect names a policy the story table resolves`` () =
 [<Fact>]
 let ``the engine fights a Grief Aspect generically when no policy table is supplied`` () =
   // This is the point of the seam: `AI` holds no branch that knows what an Aspect is. Handed no table it
-  // fights one as the GriefManifestation species it is -- Denial argues on the mental plane, so the
-  // species profile hands it a Power-vector blast and never phases out of the world. (It used to hand it an
-  // acumen interrogation; a grief manifestation has no Prowess, so that press could not land.) The
-  // signature press appears only once the story hands its own table over.
+  // fights one as the GriefManifestation species it is -- Denial argues on the mental plane with Acuity > Intellect,
+  // so the species profile hands it SynapticGlamour and never phases out of the world. The signature press
+  // appears only once the story hands its own table over.
   let denial =
     { (StoryBosses.createEnemy "denial_aspect") with
         MirrorClones = 0
         Meters = { StatusMeters.Zero with Recklessness = Meter.Create 10 } }
 
   let target = createTestPlayer ()
-  Assert.Equal(StandardAttack (ArcaneCataclysm true), AI.chooseIntent denial target)
+  Assert.Equal(StandardAttack (SynapticGlamour true), AI.chooseIntent denial target)
   Assert.Equal(StandardAttack (TraumaAttack FinesseGambit), AI.chooseIntentUsing Policies.all denial target)
 
 [<Fact>]
